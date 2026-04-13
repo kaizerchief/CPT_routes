@@ -3,7 +3,7 @@ import io
 import csv
 import json
 import datetime
-from flask import Flask, render_template, request, send_file
+from flask import Flask, render_template, request, send_file, session, redirect, url_for
 
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
@@ -11,6 +11,7 @@ from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "CptListSecureKey_2026")
 
 # Tamaños de las columnas del PDF
 COL_WIDTH_ID = 25
@@ -59,11 +60,42 @@ def cargar_ramplas():
     return ramplas_set
 
 @app.route('/')
-def index():
-    return render_template('index.html')
+def start():
+    return render_template('start.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        password = request.form.get('password')
+        master_password = os.environ.get('APP_PASSWORD', 'admin123')
+        if password == master_password:
+            session['logged_in'] = True
+            return redirect(url_for('upload'))
+        else:
+            return render_template('login.html', error="Contraseña incorrecta")
+    return render_template('login.html')
+
+@app.route('/logout')
+def logout():
+    session.pop('logged_in', None)
+    return redirect(url_for('start'))
+
+@app.route('/upload')
+def upload():
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    return render_template('upload.html')
+
+@app.route('/ver_rutas')
+def ver_rutas():
+    # Opción 2: Pública por ahora
+    return "<h2>Opción 2: Ver rutas cargadas (En construcción)</h2><a href='/'>Volver al inicio</a>"
 
 @app.route('/generar', methods=['POST'])
 def generar():
+    if not session.get('logged_in'):
+        return "No autorizado", 401
+
     if 'csv_file' not in request.files:
         return "No se ha subido ningún archivo CSV", 400
         
