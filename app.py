@@ -37,7 +37,8 @@ def save_routes_state(csv_content, params):
     }
     if db:
         try:
-            db.set("latest_routes_state", json.dumps(state))
+            # Guardar con TTL de 10 horas (36000 segundos)
+            db.set("latest_routes_state", json.dumps(state), ex=36000)
         except Exception as e:
             print(f"Error guardando en Redis: {e}")
     else:

@@ -151,6 +151,11 @@
 <body>
 
     <div class="container">
+        <div style="text-align: center; margin-bottom: 1.5rem;">
+            <span style="display: inline-block; background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.3); color: #818cf8; padding: 0.35rem 1rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; box-shadow: 0 0 10px rgba(99,102,241,0.1);">
+                🚀 Web App en fase de desarrollo
+            </span>
+        </div>
         <div class="header">
             <div class="header-icon">🔒</div>
             <h1>Acceso Restringido</h1>
@@ -177,5 +182,9 @@
         <a href="{{ url_for('start') }}" class="back-link">← Volver al inicio</a>
     </div>
 
+    <div style="position: fixed; bottom: 0; left: 0; right: 0; text-align: center; padding: 1rem; background: linear-gradient(to top, rgba(0,0,0,0.3), transparent); color: var(--text-muted); font-size: 0.75rem; line-height: 1.4; pointer-events: none;">
+        Diseñado y desarrollado por <span style="color: var(--primary); font-weight: 500;">Miguel Torres</span><br>
+        <a href="mailto:miguel.torresdev@gmail.com" style="color: var(--text-muted); text-decoration: none; transition: color 0.3s ease; pointer-events: all;" onmouseover="this.style.color='#6366f1'" onmouseout="this.style.color='#9ca3af'">miguel.torresdev@gmail.com</a>
+    </div>
 </body>
 </html>
