@@ -3,7 +3,49 @@ import io
 import csv
 import json
 import datetime
+import redis
 from flask import Flask, render_template, request, send_file, session, redirect, url_for
+
+# Configuración de base de datos
+kv_url = os.environ.get("KV_URL")
+if kv_url:
+    try:
+        db = redis.Redis.from_url(kv_url)
+    except Exception as e:
+        print(f"Error conectando a Redis: {e}")
+        db = None
+else:
+    db = None
+    if not os.path.exists("uploads"):
+        os.makedirs("uploads")
+
+def save_routes_state(csv_content, params):
+    upload_time = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
+    state = {
+        "upload_time": upload_time,
+        "params": params,
+        "csv_content": csv_content
+    }
+    if db:
+        db.set("latest_routes_state", json.dumps(state))
+    else:
+        with open("uploads/latest_routes_state.json", "w", encoding="utf-8") as f:
+            json.dump(state, f)
+            
+def get_routes_state():
+    try:
+        if db:
+            data = db.get("latest_routes_state")
+            if data:
+                return json.loads(data)
+        else:
+            path = "uploads/latest_routes_state.json"
+            if os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    return json.load(f)
+    except Exception as e:
+        print(f"Error al leer el estado persistente: {e}")
+    return None
 
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
@@ -26,6 +68,18 @@ COL_WIDTH_TIPO = 25
 COL_WIDTH_ARRIBO = 20
 COL_WIDTH_PARTIDA = 20
 COL_WIDTH_OBSERVACIONES = 75
+
+REQUIRED_COLUMNS = [
+    "Destino", "Transportista", "Nombre del Conductor 1", 
+    "Nombre del Conductor 2", "Vehiculo tractor", "Vehiculo de carga 1", 
+    "Tipo de Vehiculo", "Origen ETA", "Origen ETD"
+]
+
+DISPLAY_COLUMNS = [
+    "#", "Destino", "MLP", "Nombre del\nConductor 1", 
+    "Nombre del\nConductor 2", "Tracto", "Rampla", 
+    "Cortina", "Tipo", "A", "P", "Observaciones"
+]
 
 def get_cpt_title(etd_val):
     if not etd_val:
@@ -84,46 +138,141 @@ def logout():
 def upload():
     if not session.get('logged_in'):
         return redirect(url_for('login'))
-    return render_template('upload.html')
+    
+    state = get_routes_state()
+    upload_time = state.get("upload_time") if state else None
+    
+    return render_template('upload.html', upload_time=upload_time)
 
 @app.route('/ver_rutas')
 def ver_rutas():
-    # Opción 2: Pública por ahora
-    return "<h2>Opción 2: Ver rutas cargadas (En construcción)</h2><a href='/'>Volver al inicio</a>"
-
-@app.route('/generar', methods=['POST'])
-def generar():
-    if not session.get('logged_in'):
-        return "No autorizado", 401
-
-    if 'csv_file' not in request.files:
-        return "No se ha subido ningún archivo CSV", 400
+    state = get_routes_state()
+    if not state or not state.get("csv_content"):
+        return render_template('ver_rutas.html', status="empty")
         
-    file = request.files['csv_file']
-    if file.filename == '':
-        return "No se ha seleccionado ningún archivo", 400
-
-    min_hora_ruta = request.form.get('min_hora', '20:00')
-    max_hora_ruta = request.form.get('max_hora', '04:00')
-    incluir_sin_placa = request.form.get('incluir_sin_placa') == 'on'
+    csv_raw_text = state["csv_content"]
+    params = state["params"]
+    upload_time = state["upload_time"]
     
-    # Leer el stream como string CSV
-    stream = io.StringIO(file.stream.read().decode("utf-8-sig"), newline=None)
+    try:
+        processed_rows, fechas_citacion, ramplas_set = procesar_csv(csv_raw_text, params)
+    except Exception as e:
+        print(f"Error procesando CSV en ver_rutas: {e}")
+        return render_template('ver_rutas.html', status="error", message=str(e))
+        
+    if not processed_rows:
+        return render_template('ver_rutas.html', status="empty", message="No se encontraron registros tras aplicar los filtros guardados.")
+
+    # 1. Agrupar por CPT
+    cpt_groups = {}
+    for row in processed_rows:
+        etd_val = row.get("Origen ETD", "").strip()
+        if etd_val not in cpt_groups:
+            cpt_groups[etd_val] = {
+                "title": get_cpt_title(etd_val),
+                "rows": []
+            }
+        
+        # Pre-formatear valores de visualización para Jinja
+        display_row = {
+            "destino": str(row.get("Destino", "")),
+            "mlp": str(row.get("Transportista", "")),
+            "cond1": str(row.get("Nombre del Conductor 1", "")),
+            "cond2": str(row.get("Nombre del Conductor 2", "")),
+            "tracto": str(row.get("Vehiculo tractor", "")),
+            "rampla": str(row.get("Vehiculo de carga 1", "")),
+            "tipo": "",
+            "a": "[   ]",
+            "p": "[   ]",
+            "cortina": "",
+            "observaciones": ""
+        }
+        
+        # Tipo
+        tipo_raw = str(row.get("Tipo de Vehiculo", "")).strip().upper()
+        if tipo_raw in ["RAMPLA", "RAMPLA CORTA"]:
+            display_row["tipo"] = "LH"
+        elif tipo_raw == "CARRO":
+            display_row["tipo"] = "3/4"
+        else:
+            display_row["tipo"] = tipo_raw
+            
+        # Cortina
+        if display_row["rampla"].strip() in ramplas_set:
+            display_row["cortina"] = "SI [ ]"
+            
+        cpt_groups[etd_val]["rows"].append(display_row)
+        
+    # Mejorar el título del CPT (como en PDF)
+    for etd_val, group_data in cpt_groups.items():
+        if group_data["rows"]:
+            eta_val = processed_rows[0].get("Origen ETA", "").strip() # Usa el del primer elemento total, o mejor buscar de nuevo su row original
+            # Para simplificar y ser exacto a la iteración procesada:
+            time_str_etd = etd_val.split(" ")[-1][:5] if " " in etd_val else etd_val[:5]
+            if time_str_etd:
+                group_data["title"] = f"{group_data['title']} (Salida: {time_str_etd})"
+                
+        # Ordenar cada grupo internamente
+        group_data["rows"].sort(key=lambda r: r["destino"])
+
+    # 2. Agrupar por Zonas
+    dest_groups_def = {
+        "Zona Sur": ["SBB1", "SBB2", "SNU1", "STM1", "SVL1"],
+        "Zona Centro": ["SVP3", "SIL1", "STC1", "SLT1", "SRC1"],
+        "Zona Norte": ["SLS1", "SAF1", "SPO1", "ELS1"],
+        "Zona Metropolitana": ["SRM2", "CLCCCH", "CLCBXP"]
+    }
+    
+    zona_groups = {}
+    for g_name, g_dests in dest_groups_def.items():
+        zona_rows = []
+        for row in processed_rows:
+            if row.get("_es_segunda_vuelta", False):
+                continue
+            dest_val = str(row.get("Destino", "")).upper()
+            if any(d in dest_val for d in g_dests):
+                # Formatear filas para vista zona
+                etd_full = str(row.get("Origen ETD", ""))
+                hora_salida = etd_full.split(" ")[-1][:5] if " " in etd_full else etd_full[:5]
+                obs = ""
+                servicio_val = str(row.get("Servicio", "")).upper()
+                if "SRM2" in dest_val.upper() and "DEDICADO" in servicio_val:
+                    obs = "2 vueltas"
+                
+                zona_rows.append({
+                    "destino": str(row.get("Destino", "")),
+                    "mlp": str(row.get("Transportista", "")),
+                    "cond1": str(row.get("Nombre del Conductor 1", "")),
+                    "cond2": str(row.get("Nombre del Conductor 2", "")),
+                    "tracto": str(row.get("Vehiculo tractor", "")),
+                    "rampla": str(row.get("Vehiculo de carga 1", "")),
+                    "hora_salida": hora_salida,
+                    "origen_etd_raw": etd_full,
+                    "observaciones": obs
+                })
+                
+        if zona_rows:
+            # Sort by Destino then Origen ETD
+            zona_rows.sort(key=lambda r: (r["destino"], r["origen_etd_raw"]))
+            zona_groups[g_name] = zona_rows
+
+    return render_template(
+        'ver_rutas.html', 
+        status="loaded", 
+        upload_time=upload_time,
+        cpt_groups=cpt_groups,
+        zona_groups=zona_groups
+    )
+
+def procesar_csv(csv_raw_text, params):
+    stream = io.StringIO(csv_raw_text, newline=None)
     reader = csv.DictReader(stream)
 
     ramplas_set = cargar_ramplas()
 
-    required_columns = [
-        "Destino", "Transportista", "Nombre del Conductor 1", 
-        "Nombre del Conductor 2", "Vehiculo tractor", "Vehiculo de carga 1", 
-        "Tipo de Vehiculo", "Origen ETA", "Origen ETD"
-    ]
-
-    display_columns = [
-        "#", "Destino", "MLP", "Nombre del\nConductor 1", 
-        "Nombre del\nConductor 2", "Tracto", "Rampla", 
-        "Cortina", "Tipo", "A", "P", "Observaciones"
-    ]
+    min_hora_ruta = params.get('min_hora', '20:00')
+    max_hora_ruta = params.get('max_hora', '04:00')
+    incluir_sin_placa = params.get('incluir_sin_placa', False)
 
     valid_rows = []
     min_file_date = ""
@@ -196,10 +345,41 @@ def generar():
             row["_es_segunda_vuelta"] = False
             processed_rows.append(row)
 
+    processed_rows.sort(key=lambda r: r.get("Origen ETD", ""))
+    return processed_rows, fechas_citacion, ramplas_set
+
+@app.route('/generar', methods=['POST'])
+def generar():
+    if not session.get('logged_in'):
+        return "No autorizado", 401
+
+    if 'csv_file' not in request.files:
+        return "No se ha subido ningún archivo CSV", 400
+        
+    file = request.files['csv_file']
+    if file.filename == '':
+        return "No se ha seleccionado ningún archivo", 400
+
+    min_hora_ruta = request.form.get('min_hora', '20:00')
+    max_hora_ruta = request.form.get('max_hora', '04:00')
+    incluir_sin_placa = request.form.get('incluir_sin_placa') == 'on'
+    
+    # Leer el stream como string CSV y persistirlo
+    csv_raw_text = file.stream.read().decode("utf-8-sig")
+    
+    # Guardar en KV/Local
+    params = {
+        "min_hora": min_hora_ruta,
+        "max_hora": max_hora_ruta,
+        "incluir_sin_placa": incluir_sin_placa
+    }
+    save_routes_state(csv_raw_text, params)
+    
+    processed_rows, fechas_citacion, ramplas_set = procesar_csv(csv_raw_text, params)
+
     if not processed_rows:
         return "No se encontraron registros válidos tras aplicar los filtros. Comprueba las fechas o las horas ingresadas.", 404
 
-    processed_rows.sort(key=lambda r: r.get("Origen ETD", ""))
     groups = {}
     for row in processed_rows:
         if row.get("_es_segunda_vuelta", False):
@@ -226,7 +406,7 @@ def generar():
         return Paragraph(text, style_centered if is_centered else style_normal)
 
     header_style = ParagraphStyle("table_header", parent=styles["Normal"], fontSize=9, textColor=colors.whitesmoke, alignment=1)
-    headers = [Paragraph(f"<b>{col.replace(chr(10), '<br/>')}</b>", header_style) for col in display_columns]
+    headers = [Paragraph(f"<b>{col.replace(chr(10), '<br/>')}</b>", header_style) for col in DISPLAY_COLUMNS]
 
     story = []
     
@@ -298,7 +478,7 @@ def generar():
         for idx, row in enumerate(rows_in_group, start=1):
             row_data = [make_paragraph(str(idx), is_centered=True)]
             
-            for col in required_columns:
+            for col in REQUIRED_COLUMNS:
                 val = str(row.get(col, ""))
                 if col in ["Origen ETA", "Origen ETD"]:
                     val = "[   ]"

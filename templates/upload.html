@@ -272,6 +272,15 @@
         <div class="header">
             <h1>Generador de Rutas</h1>
             <p>Sube tu archivo CSV para procesar el reporte CPT</p>
+            {% if upload_time %}
+            <p style="margin-top: 10px; font-size: 0.85rem; color: #a5b4fc; background: rgba(99, 102, 241, 0.1); padding: 5px 10px; border-radius: 6px; display: inline-block;">
+                🕒 Último CSV cargado: {{ upload_time }}
+            </p>
+            {% else %}
+            <p style="margin-top: 10px; font-size: 0.85rem; color: #ef4444; background: rgba(239, 68, 68, 0.1); padding: 5px 10px; border-radius: 6px; display: inline-block;">
+                ⚠️ Ningún CSV ha sido cargado todavía
+            </p>
+            {% endif %}
         </div>
 
         <form id="generadorForm" action="{{ url_for('generar') }}" method="POST" enctype="multipart/form-data">
