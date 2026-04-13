@@ -174,8 +174,6 @@
             border-collapse: collapse;
             font-size: 0.85rem;
             text-align: center;
-            white-space: normal;
-            word-break: break-word;
         }
 
         thead {
@@ -190,6 +188,12 @@
 
         th {
             font-weight: 500;
+            white-space: nowrap;
+        }
+
+        td {
+            white-space: normal;
+            min-width: 70px;
         }
 
         tbody tr:nth-child(even) {

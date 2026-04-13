@@ -257,7 +257,7 @@ def ver_rutas():
                 
                 rampla_val = str(row.get("Vehiculo de carga 1", ""))
                 if rampla_val.strip() in ramplas_set:
-                    obs_list.append("Requiere Cortina Sider")
+                    obs_list.append("Cortina")
                     
                 obs = ", ".join(obs_list)
                 
