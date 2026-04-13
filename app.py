@@ -198,9 +198,6 @@ def ver_rutas():
             "tracto": str(row.get("Vehiculo tractor", "")),
             "rampla": str(row.get("Vehiculo de carga 1", "")),
             "tipo": "",
-            "a": "[   ]",
-            "p": "[   ]",
-            "cortina": "",
             "observaciones": ""
         }
         
@@ -213,9 +210,12 @@ def ver_rutas():
         else:
             display_row["tipo"] = tipo_raw
             
-        # Cortina
+        # Observaciones y Cortina combinados
+        observaciones_list = []
         if display_row["rampla"].strip() in ramplas_set:
-            display_row["cortina"] = "SI [ ]"
+            observaciones_list.append("Cortina")
+        
+        display_row["observaciones"] = ", ".join(observaciones_list)
             
         cpt_groups[etd_val]["rows"].append(display_row)
         
@@ -250,10 +250,16 @@ def ver_rutas():
                 # Formatear filas para vista zona
                 etd_full = str(row.get("Origen ETD", ""))
                 hora_salida = etd_full.split(" ")[-1][:5] if " " in etd_full else etd_full[:5]
-                obs = ""
+                obs_list = []
                 servicio_val = str(row.get("Servicio", "")).upper()
                 if "SRM2" in dest_val.upper() and "DEDICADO" in servicio_val:
-                    obs = "2 vueltas"
+                    obs_list.append("2 vueltas")
+                
+                rampla_val = str(row.get("Vehiculo de carga 1", ""))
+                if rampla_val.strip() in ramplas_set:
+                    obs_list.append("Requiere Cortina Sider")
+                    
+                obs = ", ".join(obs_list)
                 
                 zona_rows.append({
                     "destino": str(row.get("Destino", "")),

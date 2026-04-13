@@ -174,7 +174,8 @@
             border-collapse: collapse;
             font-size: 0.85rem;
             text-align: center;
-            white-space: nowrap;
+            white-space: normal;
+            word-break: break-word;
         }
 
         thead {
@@ -277,10 +278,7 @@
                                     <th>Conductor 2</th>
                                     <th>Tracto</th>
                                     <th>Rampla</th>
-                                    <th>Cortina</th>
                                     <th>Tipo</th>
-                                    <th>A</th>
-                                    <th>P</th>
                                     <th>Observaciones</th>
                                 </tr>
                             </thead>
@@ -294,10 +292,7 @@
                                     <td>{{ row.cond2 }}</td>
                                     <td>{{ row.tracto }}</td>
                                     <td>{{ row.rampla }}</td>
-                                    <td>{{ row.cortina }}</td>
                                     <td>{{ row.tipo }}</td>
-                                    <td>{{ row.a }}</td>
-                                    <td>{{ row.p }}</td>
                                     <td>{{ row.observaciones }}</td>
                                 </tr>
                                 {% endfor %}
