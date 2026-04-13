@@ -6,6 +6,8 @@ import datetime
 import redis
 from flask import Flask, render_template, request, send_file, session, redirect, url_for
 
+import tempfile
+
 # Configuración de base de datos
 kv_url = os.environ.get("KV_URL")
 if kv_url:
@@ -16,8 +18,15 @@ if kv_url:
         db = None
 else:
     db = None
-    if not os.path.exists("uploads"):
-        os.makedirs("uploads")
+
+# Fallback path seguro para sistemas de solo lectura (como Vercel)
+FALLBACK_DIR = os.path.join(tempfile.gettempdir(), "cpt_uploads")
+if not db:
+    try:
+        if not os.path.exists(FALLBACK_DIR):
+            os.makedirs(FALLBACK_DIR, exist_ok=True)
+    except Exception as e:
+        print(f"Advertencia: No se pudo crear directorio temporal fallback: {e}")
 
 def save_routes_state(csv_content, params):
     upload_time = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
@@ -27,10 +36,17 @@ def save_routes_state(csv_content, params):
         "csv_content": csv_content
     }
     if db:
-        db.set("latest_routes_state", json.dumps(state))
+        try:
+            db.set("latest_routes_state", json.dumps(state))
+        except Exception as e:
+            print(f"Error guardando en Redis: {e}")
     else:
-        with open("uploads/latest_routes_state.json", "w", encoding="utf-8") as f:
-            json.dump(state, f)
+        path = os.path.join(FALLBACK_DIR, "latest_routes_state.json")
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(state, f)
+        except Exception as e:
+            print(f"Error guardando localmente: {e}")
             
 def get_routes_state():
     try:
@@ -39,7 +55,7 @@ def get_routes_state():
             if data:
                 return json.loads(data)
         else:
-            path = "uploads/latest_routes_state.json"
+            path = os.path.join(FALLBACK_DIR, "latest_routes_state.json")
             if os.path.exists(path):
                 with open(path, "r", encoding="utf-8") as f:
                     return json.load(f)
