@@ -3,25 +3,19 @@ import io
 import csv
 import json
 import datetime
-import redis
+import requests
 from flask import Flask, render_template, request, send_file, session, redirect, url_for
 
 import tempfile
 
-# Configuración de base de datos
-kv_url = os.environ.get("KV_URL")
-if kv_url:
-    try:
-        db = redis.Redis.from_url(kv_url)
-    except Exception as e:
-        print(f"Error conectando a Redis: {e}")
-        db = None
-else:
-    db = None
+# Configuración de Vercel Blob
+BLOB_READ_WRITE_TOKEN = os.environ.get("BLOB_READ_WRITE_TOKEN")
+BLOB_API_URL = "https://blob.vercel-storage.com"
+BLOB_ENABLED = bool(BLOB_READ_WRITE_TOKEN)
 
 # Fallback path seguro para sistemas de solo lectura (como Vercel)
 FALLBACK_DIR = os.path.join(tempfile.gettempdir(), "cpt_uploads")
-if not db:
+if not BLOB_ENABLED:
     try:
         if not os.path.exists(FALLBACK_DIR):
             os.makedirs(FALLBACK_DIR, exist_ok=True)
@@ -35,12 +29,19 @@ def save_routes_state(csv_content, params):
         "params": params,
         "csv_content": csv_content
     }
-    if db:
+    
+    if BLOB_ENABLED:
         try:
-            # Guardar con TTL de 10 horas (36000 segundos)
-            db.set("latest_routes_state", json.dumps(state), ex=36000)
+            headers = {
+                "Authorization": f"Bearer {BLOB_READ_WRITE_TOKEN}",
+                "Content-Type": "application/json"
+            }
+            url = f"{BLOB_API_URL}/latest_routes_state"
+            response = requests.put(url, json=state, headers=headers, timeout=10)
+            if response.status_code not in [200, 201]:
+                print(f"Error guardando en Vercel Blob: {response.status_code} - {response.text}")
         except Exception as e:
-            print(f"Error guardando en Redis: {e}")
+            print(f"Error guardando en Vercel Blob: {e}")
     else:
         path = os.path.join(FALLBACK_DIR, "latest_routes_state.json")
         try:
@@ -51,10 +52,14 @@ def save_routes_state(csv_content, params):
             
 def get_routes_state():
     try:
-        if db:
-            data = db.get("latest_routes_state")
-            if data:
-                return json.loads(data)
+        if BLOB_ENABLED:
+            headers = {
+                "Authorization": f"Bearer {BLOB_READ_WRITE_TOKEN}"
+            }
+            url = f"{BLOB_API_URL}/latest_routes_state"
+            response = requests.get(url, headers=headers, timeout=10)
+            if response.status_code == 200:
+                return response.json()
         else:
             path = os.path.join(FALLBACK_DIR, "latest_routes_state.json")
             if os.path.exists(path):
@@ -63,6 +68,7 @@ def get_routes_state():
     except Exception as e:
         print(f"Error al leer el estado persistente: {e}")
     return None
+
 
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
