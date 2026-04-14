@@ -51,72 +51,46 @@ def save_routes_state(csv_content, params):
 
     if BLOB_TOKEN:
         try:
-            print(f"[DEBUG] Guardando en Vercel Blob con {len(serialized_state)} bytes...")
-            # Subir a Vercel Blob como bytes (esto crea una nueva versión del archivo)
-            result = put(VERCEL_BLOB_OBJECT_NAME, serialized_state.encode('utf-8'), {"access": "public"})
-            print(f"[DEBUG] put() completó exitosamente: {result}")
+            # Subir a Vercel Blob (esto crea una nueva versión del archivo)
+            put(VERCEL_BLOB_OBJECT_NAME, serialized_state, {"access": "public"})
             return
         except Exception as e:
-            print(f"[ERROR] Error guardando en Vercel Blob: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"Error guardando en Vercel Blob: {e}")
 
     # Fallback local (volátil en Vercel)
     path = os.path.join(FALLBACK_DIR, VERCEL_BLOB_OBJECT_NAME)
     try:
-        print(f"[DEBUG] Guardando en fallback local: {path}")
         with open(path, "w", encoding="utf-8") as f:
             f.write(serialized_state)
-        print(f"[DEBUG] Archivo local guardado exitosamente ({len(serialized_state)} bytes)")
     except Exception as e:
-        print(f"[ERROR] Error guardando localmente: {e}")
+        print(f"Error guardando localmente: {e}")
 
 def get_routes_state():
     try:
         if BLOB_TOKEN:
-            print(f"[DEBUG] Intentando recuperar desde Vercel Blob...")
             # Construir URL directa del Blob (Vercel Blob usa URLs predecibles)
             # Formato: https://<hash>.public.blob.vercelusercontent.com/<filename>
             # Se obtiene del resultado de put(), pero para lectura se puede hacer GET directo
             blobs_response = list_blobs({"prefix": VERCEL_BLOB_OBJECT_NAME, "limit": 1})
-            print(f"[DEBUG] list_blobs response: {blobs_response}")
             
             if blobs_response.get('blobs') and len(blobs_response['blobs']) > 0:
                 blob_url = blobs_response['blobs'][0]['url']
-                print(f"[DEBUG] Blob URL encontrada: {blob_url}")
                 response = requests.get(blob_url)
-                print(f"[DEBUG] GET response status: {response.status_code}")
                 if response.status_code == 200:
-                    state = json.loads(response.text)
-                    print(f"[DEBUG] Estado parseado, upload_time: {state.get('upload_time')}")
+                    state = response.json()
                     if not _is_state_expired(state):
                         return state
-                    else:
-                        print(f"[DEBUG] Estado expirado")
-            else:
-                print(f"[DEBUG] No se encontraron blobs")
             return None
 
         # Fallback local
-        print(f"[DEBUG] BLOB_TOKEN no configurado, usando fallback local")
         path = os.path.join(FALLBACK_DIR, VERCEL_BLOB_OBJECT_NAME)
-        print(f"[DEBUG] Buscando en: {path}")
         if os.path.exists(path):
-            print(f"[DEBUG] Archivo local encontrado")
             with open(path, "r", encoding="utf-8") as f:
                 state = json.load(f)
-                print(f"[DEBUG] Estado local parseado, upload_time: {state.get('upload_time')}")
                 if not _is_state_expired(state):
-                    print(f"[DEBUG] Estado local válido, retornando")
                     return state
-                else:
-                    print(f"[DEBUG] Estado local expirado")
-        else:
-            print(f"[DEBUG] Archivo local NO encontrado en {path}")
     except Exception as e:
-        print(f"[ERROR] Error al recuperar estado: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"Error al recuperar estado: {e}")
     return None
 
 # --- LÓGICA DE NEGOCIO Y PROCESAMIENTO ---
