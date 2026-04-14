@@ -3,71 +3,30 @@ import io
 import csv
 import json
 import datetime
-import urllib.request
-import urllib.error
+import redis
 from flask import Flask, render_template, request, send_file, session, redirect, url_for
 
 import tempfile
 
-# Configuración de almacenamiento
-VERCEL_BLOB_TOKEN = os.environ.get("VERCEL_BLOB_TOKEN")
-VERCEL_BLOB_URL = os.environ.get("VERCEL_BLOB_URL")
-VERCEL_BLOB_BASE_URL = os.environ.get("VERCEL_BLOB_BASE_URL")
-VERCEL_BLOB_OBJECT_NAME = os.environ.get("VERCEL_BLOB_OBJECT_NAME", "latest_routes_state.json")
+# Configuración de base de datos
+kv_url = os.environ.get("KV_URL")
+if kv_url:
+    try:
+        db = redis.Redis.from_url(kv_url)
+    except Exception as e:
+        print(f"Error conectando a Redis: {e}")
+        db = None
+else:
+    db = None
 
-ROUTES_STATE_TTL_SECONDS = 36000
-
-
-def get_blob_url():
-    if VERCEL_BLOB_URL:
-        return VERCEL_BLOB_URL
-    if VERCEL_BLOB_BASE_URL:
-        return f"{VERCEL_BLOB_BASE_URL.rstrip('/')}/{VERCEL_BLOB_OBJECT_NAME}"
-    return None
-
-blob_url = get_blob_url()
-blob_enabled = bool(VERCEL_BLOB_TOKEN and blob_url)
-
-# Fallback path seguro para sistemas de solo lectura (como Vercel localmente sin Blob)
+# Fallback path seguro para sistemas de solo lectura (como Vercel)
 FALLBACK_DIR = os.path.join(tempfile.gettempdir(), "cpt_uploads")
-if not blob_enabled:
+if not db:
     try:
         if not os.path.exists(FALLBACK_DIR):
             os.makedirs(FALLBACK_DIR, exist_ok=True)
     except Exception as e:
         print(f"Advertencia: No se pudo crear directorio temporal fallback: {e}")
-
-
-def _is_state_expired(state):
-    upload_time = state.get("upload_time")
-    if not upload_time:
-        return True
-    try:
-        state_time = datetime.datetime.strptime(upload_time, "%d/%m/%Y %H:%M")
-        return (datetime.datetime.now() - state_time).total_seconds() >= ROUTES_STATE_TTL_SECONDS
-    except Exception:
-        return False
-
-
-def _fetch_blob_state():
-    request = urllib.request.Request(blob_url, method="GET")
-    request.add_header("Authorization", f"Bearer {VERCEL_BLOB_TOKEN}")
-    try:
-        with urllib.request.urlopen(request, timeout=20) as response:
-            return response.read().decode("utf-8")
-    except urllib.error.HTTPError as e:
-        if e.code == 404:
-            return None
-        raise
-
-
-def _save_blob_state(state_str):
-    request = urllib.request.Request(blob_url, data=state_str.encode("utf-8"), method="PUT")
-    request.add_header("Authorization", f"Bearer {VERCEL_BLOB_TOKEN}")
-    request.add_header("Content-Type", "application/json")
-    with urllib.request.urlopen(request, timeout=20) as response:
-        return response.status
-
 
 def save_routes_state(csv_content, params):
     upload_time = datetime.datetime.now().strftime("%d/%m/%Y %H:%M")
@@ -76,39 +35,31 @@ def save_routes_state(csv_content, params):
         "params": params,
         "csv_content": csv_content
     }
-    serialized_state = json.dumps(state)
-
-    if blob_enabled:
+    if db:
         try:
-            _save_blob_state(serialized_state)
-            return
+            # Guardar con TTL de 10 horas (36000 segundos)
+            db.set("latest_routes_state", json.dumps(state), ex=36000)
         except Exception as e:
-            print(f"Error guardando en Vercel Blob: {e}")
-
-    path = os.path.join(FALLBACK_DIR, "latest_routes_state.json")
-    try:
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(state, f)
-    except Exception as e:
-        print(f"Error guardando localmente: {e}")
-
-
+            print(f"Error guardando en Redis: {e}")
+    else:
+        path = os.path.join(FALLBACK_DIR, "latest_routes_state.json")
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(state, f)
+        except Exception as e:
+            print(f"Error guardando localmente: {e}")
+            
 def get_routes_state():
     try:
-        if blob_enabled:
-            data = _fetch_blob_state()
+        if db:
+            data = db.get("latest_routes_state")
             if data:
-                state = json.loads(data)
-                if not _is_state_expired(state):
-                    return state
-                return None
+                return json.loads(data)
         else:
             path = os.path.join(FALLBACK_DIR, "latest_routes_state.json")
             if os.path.exists(path):
                 with open(path, "r", encoding="utf-8") as f:
-                    state = json.load(f)
-                    if not _is_state_expired(state):
-                        return state
+                    return json.load(f)
     except Exception as e:
         print(f"Error al leer el estado persistente: {e}")
     return None
