@@ -1,4 +1,4 @@
-import os, io, csv, json, datetime, redis, tempfile
+import os, io, csv, json, datetime, redis, tempfile, re
 from flask import Flask, render_template, request, send_file, session, redirect, url_for
 
 # --- Vercel KV (Upstash Redis) ---
@@ -148,29 +148,46 @@ def ver_rutas():
         return render_template('ver_rutas.html', status="empty",
                                message="No se encontraron registros tras aplicar los filtros guardados.")
 
-    cpt_groups = {}
+    def get_base_dest(dest):
+        """Extrae el prefijo base del destino (p.ej. 'SBB1' de 'SBB1(2COND)' o 'SRM2' de 'SRM2_DEDICADO')."""
+        m = re.match(r'^([A-Za-z0-9]+)', str(dest).strip().upper())
+        return m.group(1) if m else str(dest).strip().upper()
+
+    # --- Vista por CPT: agrupar por ETD, luego por destino base ---
+    cpt_raw = {}
     for row in processed_rows:
         etd_val = row.get("Origen ETD","").strip()
-        if etd_val not in cpt_groups:
-            cpt_groups[etd_val] = {"title": get_cpt_title(etd_val), "rows": []}
+        if etd_val not in cpt_raw:
+            cpt_raw[etd_val] = {"title": get_cpt_title(etd_val), "rows": []}
         tipo_raw = str(row.get("Tipo de Vehiculo","")).strip().upper()
         tipo = "LH" if tipo_raw in ["RAMPLA","RAMPLA CORTA"] else ("3/4" if tipo_raw=="CARRO" else tipo_raw)
         rampla_val = str(row.get("Vehiculo de carga 1",""))
         obs_list = ["Cortina"] if rampla_val.strip() in ramplas_set else []
-        cpt_groups[etd_val]["rows"].append({
+        cpt_raw[etd_val]["rows"].append({
             "destino": str(row.get("Destino","")),
-            "mlp": str(row.get("Transportista","")),
-            "cond1": str(row.get("Nombre del Conductor 1","")),
-            "cond2": str(row.get("Nombre del Conductor 2","")),
-            "tracto": str(row.get("Vehiculo tractor","")),
-            "rampla": rampla_val, "tipo": tipo,
+            "mlp":     str(row.get("Transportista","")),
+            "cond1":   str(row.get("Nombre del Conductor 1","")),
+            "cond2":   str(row.get("Nombre del Conductor 2","")),
+            "tracto":  str(row.get("Vehiculo tractor","")),
+            "rampla":  rampla_val, "tipo": tipo,
             "observaciones": ", ".join(obs_list),
         })
-    for etd_val, gd in cpt_groups.items():
-        ts = etd_val.split(" ")[-1][:5] if " " in etd_val else etd_val[:5]
-        if ts: gd["title"] = f"{gd['title']} (Salida: {ts})"
-        gd["rows"].sort(key=lambda r: r["destino"])
 
+    cpt_groups = {}
+    for etd_val, gd in cpt_raw.items():
+        ts = etd_val.split(" ")[-1][:5] if " " in etd_val else etd_val[:5]
+        title = gd["title"]
+        if ts: title = f"{title} (Salida: {ts})"
+        rows_sorted = sorted(gd["rows"], key=lambda r: r["destino"])
+        dest_groups = {}
+        for row in rows_sorted:
+            bd = get_base_dest(row["destino"])
+            if bd not in dest_groups:
+                dest_groups[bd] = {"label": bd, "rows": []}
+            dest_groups[bd]["rows"].append(row)
+        cpt_groups[etd_val] = {"title": title, "dest_groups": dest_groups}
+
+    # --- Vista por Zonas: agrupar por zona, luego por destino base ---
     dest_groups_def = {
         "Zona Sur":           ["SBB1","SBB2","SNU1","STM1","SVL1"],
         "Zona Centro":        ["SVP3","SIL1","STC1","SLT1","SRC1"],
@@ -179,29 +196,45 @@ def ver_rutas():
     }
     zona_groups = {}
     for g_name, g_dests in dest_groups_def.items():
-        zona_rows = []
+        zona_raw = []
         for row in processed_rows:
             if row.get("_es_segunda_vuelta"): continue
             dest_val = str(row.get("Destino","")).upper()
             if not any(d in dest_val for d in g_dests): continue
             etd_full = str(row.get("Origen ETD",""))
             hora_salida = etd_full.split(" ")[-1][:5] if " " in etd_full else etd_full[:5]
+            tipo_raw = str(row.get("Tipo de Vehiculo","")).strip().upper()
+            tipo = "LH" if tipo_raw in ["RAMPLA","RAMPLA CORTA"] else ("3/4" if tipo_raw=="CARRO" else tipo_raw)
             obs_list = []
             if "SRM2" in dest_val and "DEDICADO" in str(row.get("Servicio","")).upper():
                 obs_list.append("2 vueltas")
             rampla_val = str(row.get("Vehiculo de carga 1",""))
             if rampla_val.strip() in ramplas_set: obs_list.append("Cortina")
-            zona_rows.append({
-                "destino": str(row.get("Destino","")), "mlp": str(row.get("Transportista","")),
-                "cond1": str(row.get("Nombre del Conductor 1","")),
-                "cond2": str(row.get("Nombre del Conductor 2","")),
-                "tracto": str(row.get("Vehiculo tractor","")), "rampla": rampla_val,
-                "hora_salida": hora_salida, "origen_etd_raw": etd_full,
+            zona_raw.append({
+                "destino":      str(row.get("Destino","")),
+                "mlp":          str(row.get("Transportista","")),
+                "cond1":        str(row.get("Nombre del Conductor 1","")),
+                "cond2":        str(row.get("Nombre del Conductor 2","")),
+                "tracto":       str(row.get("Vehiculo tractor","")),
+                "rampla":       rampla_val,
+                "tipo":         tipo,
+                "hora_salida":  hora_salida,
+                "origen_etd_raw": etd_full,
                 "observaciones": ", ".join(obs_list),
             })
-        if zona_rows:
-            zona_rows.sort(key=lambda r: (r["destino"], r["origen_etd_raw"]))
-            zona_groups[g_name] = zona_rows
+        if zona_raw:
+            zona_raw.sort(key=lambda r: (get_base_dest(r["destino"]), r["destino"], r["origen_etd_raw"]))
+            dest_groups = {}
+            for row in zona_raw:
+                bd = get_base_dest(row["destino"])
+                if bd not in dest_groups:
+                    dest_groups[bd] = {"label": bd, "salidas": [], "rows": []}
+                if row["hora_salida"] and row["hora_salida"] not in dest_groups[bd]["salidas"]:
+                    dest_groups[bd]["salidas"].append(row["hora_salida"])
+                dest_groups[bd]["rows"].append(row)
+            for dg in dest_groups.values():
+                dg["salidas"].sort()
+            zona_groups[g_name] = dest_groups
 
     return render_template('ver_rutas.html', status="loaded",
         upload_time=state["upload_time"], expires_at=state.get("expires_at"),
@@ -270,6 +303,7 @@ def generar():
         "min_hora":           request.form.get('min_hora','20:00'),
         "max_hora":           request.form.get('max_hora','04:00'),
         "incluir_sin_placa":  request.form.get('incluir_sin_placa') == 'on',
+        "generar_pdf":        request.form.get('generar_pdf') == 'on',
     }
     csv_raw_text = file.stream.read().decode("utf-8-sig")
     save_routes_state(csv_raw_text, params)
@@ -277,6 +311,11 @@ def generar():
     processed_rows, fechas_citacion, ramplas_set = procesar_csv(csv_raw_text, params)
     if not processed_rows:
         return "No se encontraron registros válidos tras aplicar los filtros.", 404
+
+    # Si el usuario desactivó la generación de PDF, terminar aquí
+    if not params.get('generar_pdf', True):
+        from flask import jsonify
+        return jsonify({"status": "ok", "message": "Rutas cargadas correctamente"})
 
     groups = {}
     for row in processed_rows:
@@ -329,9 +368,14 @@ def generar():
 
     for etd_val, rows_in_group in groups.items():
         cpt_title=get_cpt_title(etd_val)
-        eta_val=rows_in_group[0].get("Origen ETA","").strip()
-        te=eta_val.split(" ")[-1][:5] if " " in eta_val else eta_val[:5]
         td=etd_val.split(" ")[-1][:5] if " " in etd_val else etd_val[:5]
+        te=""
+        try:
+            h,m = map(int, td.split(':'))
+            t = h*60+m-80
+            if t<0: t+=1440
+            te = f"{t//60:02d}:{t%60:02d}"
+        except: pass
         if te and td: cpt_title=f"{cpt_title} (Citación: {te} | Salida: {td})"
         elif td: cpt_title=f"{cpt_title} (Salida: {td})"
         story.append(Paragraph(f"<b>{cpt_title}</b>",tts))

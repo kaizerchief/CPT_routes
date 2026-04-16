@@ -15,14 +15,11 @@
             --text-muted: #9ca3af;
             --border-color: #374151;
             --input-bg: #1f2937;
+            --acc-bg: rgba(46, 64, 83, 0.55);
+            --acc-open-bg: rgba(99, 102, 241, 0.18);
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Outfit', sans-serif;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Outfit', sans-serif; }
 
         body {
             background-color: var(--bg-color);
@@ -31,348 +28,375 @@
             display: flex;
             justify-content: center;
             align-items: flex-start;
-            padding: 2rem;
-            background-image: radial-gradient(circle at top right, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
-                              radial-gradient(circle at bottom left, rgba(99, 102, 241, 0.1) 0%, transparent 40%);
+            padding: 2rem 1rem 5rem;
+            background-image:
+                radial-gradient(circle at top right, rgba(99,102,241,0.15) 0%, transparent 40%),
+                radial-gradient(circle at bottom left, rgba(99,102,241,0.1) 0%, transparent 40%);
             background-attachment: fixed;
         }
 
         .container {
             width: 100%;
-            max-width: 1000px;
+            max-width: 680px;
             background: var(--card-bg);
             border-radius: 16px;
-            padding: 2.5rem;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+            padding: 1.5rem 1.25rem 2rem;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.05);
             position: relative;
         }
 
+        /* ── NAV ── */
         .nav-link {
-            position: absolute;
-            top: 25px;
-            left: 25px;
-            color: var(--text-muted);
-            text-decoration: none;
-            font-size: 0.9rem;
-            transition: color 0.3s ease;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            background: rgba(255,255,255,0.05);
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
+            display: inline-flex; align-items: center; gap: 0.4rem;
+            color: var(--text-muted); text-decoration: none; font-size: 0.82rem;
+            background: rgba(255,255,255,0.05); padding: 0.4rem 0.9rem;
+            border-radius: 8px; transition: all 0.2s ease;
+            margin-bottom: 1rem;
         }
+        .nav-link:hover { color: var(--text-main); background: rgba(255,255,255,0.1); }
 
-        .nav-link:hover {
-            color: var(--text-main);
-            background: rgba(255,255,255,0.1);
-        }
-
-        .header {
-            text-align: center;
-            margin-bottom: 2rem;
-            margin-top: 1rem;
-        }
-
+        /* ── HEADER ── */
+        .header { text-align: center; margin: 0.5rem 0 1.5rem; }
         .header h1 {
-            font-size: 1.8rem;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
+            font-size: 1.65rem; font-weight: 600; margin-bottom: 0.4rem;
             background: linear-gradient(135deg, #a5b4fc, #818cf8);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .badge-info {
+            display: inline-block; margin-top: 0.4rem; font-size: 0.8rem;
+            padding: 3px 12px; border-radius: 6px;
+            color: #a5b4fc; background: rgba(99,102,241,0.1);
+            border: 1px solid rgba(99,102,241,0.2);
         }
 
-        .badge {
-            margin-top: 10px;
-            font-size: 0.85rem;
-            padding: 5px 12px;
-            border-radius: 6px;
-            display: inline-block;
-        }
-
-        .badge.info {
-            color: #a5b4fc;
-            background: rgba(99, 102, 241, 0.1);
-            border: 1px solid rgba(99, 102, 241, 0.2);
-        }
-
-        .badge.warning {
-            color: #ef4444;
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px solid rgba(239, 68, 68, 0.2);
-            font-size: 1rem;
-            padding: 10px 20px;
-        }
-
-        .tabs {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 2rem;
-            justify-content: center;
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 1rem;
-        }
-
-        .tab-btn {
-            background: transparent;
-            border: 1px solid var(--border-color);
-            color: var(--text-muted);
-            padding: 0.75rem 1.5rem;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 1rem;
-            font-weight: 500;
-            transition: all 0.3s ease;
-        }
-
-        .tab-btn:hover {
-            border-color: var(--primary);
-            color: var(--text-main);
-        }
-
-        .tab-btn.active {
-            background: var(--primary);
-            color: white;
-            border-color: var(--primary);
-            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
-        }
-
-        .view-section {
-            display: none;
-            animation: fadeIn 0.4s ease;
-        }
-
-        .view-section.active {
-            display: block;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .table-title {
-            font-size: 1.25rem;
-            font-weight: 500;
-            margin: 2rem 0 1rem;
-            color: #a5b4fc;
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 0.5rem;
-        }
-
-        .table-responsive {
-            overflow-x: auto;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-            background: var(--input-bg);
-            margin-bottom: 1rem;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.85rem;
-            text-align: center;
-        }
-
-        thead {
-            background: #2E4053;
-            color: whitesmoke;
-        }
-
-        th, td {
-            padding: 0.75rem;
-            border: 1px solid var(--border-color);
-        }
-
-        th {
-            font-weight: 500;
-            white-space: nowrap;
-        }
-
-        td {
-            white-space: normal;
-            min-width: 70px;
-        }
-
-        tbody tr:nth-child(even) {
-            background-color: rgba(255, 255, 255, 0.03);
-        }
-
-        tbody tr:hover {
-            background-color: rgba(99, 102, 241, 0.1);
-        }
-
+        /* ── EMPTY STATE ── */
         .empty-state {
-            text-align: center;
-            padding: 4rem 1rem;
-            background: var(--input-bg);
-            border-radius: 12px;
-            border: 1px dashed var(--border-color);
-            margin-top: 2rem;
+            text-align: center; padding: 3.5rem 1rem;
+            background: var(--input-bg); border-radius: 12px;
+            border: 1px dashed var(--border-color); margin-top: 1.5rem;
         }
-
-        .empty-state h2 {
-            font-size: 1.5rem;
-            color: var(--text-main);
-            margin-bottom: 1rem;
-        }
-
-        .empty-state p {
-            color: var(--text-muted);
-            margin-bottom: 2rem;
-        }
-
+        .empty-state h2 { font-size: 1.35rem; color: var(--text-main); margin-bottom: 0.65rem; }
+        .empty-state p  { color: var(--text-muted); margin-bottom: 1.5rem; font-size: 0.9rem; }
         .btn-home {
-            background: var(--primary);
-            color: white;
-            padding: 0.75rem 1.5rem;
-            border-radius: 8px;
-            text-decoration: none;
-            font-weight: 500;
-            display: inline-block;
-            transition: all 0.2s ease;
+            background: var(--primary); color: white; padding: 0.65rem 1.4rem;
+            border-radius: 8px; text-decoration: none; font-weight: 500;
+            display: inline-block; transition: all 0.2s ease;
+        }
+        .btn-home:hover { background: var(--primary-hover); transform: translateY(-2px); }
+
+        /* ── TABS ── */
+        .tabs {
+            display: flex; gap: 0.6rem; justify-content: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 1rem; margin-bottom: 1.5rem;
+        }
+        .tab-btn {
+            background: transparent; border: 1px solid var(--border-color);
+            color: var(--text-muted); padding: 0.55rem 1.2rem;
+            border-radius: 8px; cursor: pointer; font-size: 0.88rem; font-weight: 500;
+            transition: all 0.25s ease; font-family: 'Outfit', sans-serif;
+        }
+        .tab-btn:hover  { border-color: var(--primary); color: var(--text-main); }
+        .tab-btn.active {
+            background: var(--primary); color: white; border-color: var(--primary);
+            box-shadow: 0 4px 15px rgba(99,102,241,0.35);
         }
 
-        .btn-home:hover {
-            background: var(--primary-hover);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        /* ── VIEW SECTIONS ── */
+        .view-section { display: none; animation: fadeIn 0.3s ease; }
+        .view-section.active { display: block; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to   { opacity: 1; transform: translateY(0); }
         }
+
+        /* ── ZONE / GROUP TITLE ── */
+        .group-title {
+            font-size: 0.88rem; font-weight: 600; color: #818cf8;
+            margin: 1.4rem 0 0.55rem;
+            padding-bottom: 0.35rem;
+            border-bottom: 1px solid rgba(99,102,241,0.2);
+            display: flex; align-items: center; gap: 0.45rem;
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .group-title:first-child { margin-top: 0; }
+
+        /* ── ACCORDION ── */
+        .accordion {
+            margin-bottom: 0.35rem;
+            border-radius: 10px; overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        .accordion-header {
+            width: 100%; background: var(--acc-bg);
+            border: none; cursor: pointer;
+            padding: 0.7rem 0.9rem;
+            display: flex; justify-content: space-between; align-items: center;
+            color: var(--text-main); font-family: 'Outfit', sans-serif;
+            font-size: 0.88rem; transition: background 0.2s ease; text-align: left;
+            gap: 0.5rem;
+        }
+        .accordion-header:hover   { background: rgba(99,102,241,0.12); }
+        .accordion-header.open    {
+            background: var(--acc-open-bg);
+            border-bottom: 1px solid rgba(99,102,241,0.22);
+        }
+
+        .acc-left  { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; min-width: 0; }
+        .acc-dest  { font-weight: 600; font-size: 0.92rem; white-space: nowrap; }
+        .acc-count {
+            font-size: 0.7rem; background: rgba(99,102,241,0.2); color: #a5b4fc;
+            padding: 0.1rem 0.5rem; border-radius: 99px; font-weight: 500; white-space: nowrap;
+        }
+        .acc-salidas {
+            font-size: 0.75rem; color: #818cf8;
+            background: rgba(99,102,241,0.08);
+            padding: 0.1rem 0.45rem; border-radius: 99px; white-space: nowrap;
+        }
+        .acc-arrow {
+            font-size: 0.6rem; color: var(--text-muted);
+            transition: transform 0.3s ease; flex-shrink: 0;
+        }
+        .accordion-header.open .acc-arrow { transform: rotate(90deg); }
+
+        /* ── ACCORDION BODY (smooth max-height animation) ── */
+        .accordion-body {
+            overflow: hidden;
+            max-height: 0;
+            transition: max-height 0.35s ease, padding 0.3s ease, gap 0.3s ease;
+            display: flex; flex-direction: column;
+            gap: 0;
+            padding: 0 0.6rem;
+            background: rgba(10, 12, 16, 0.55);
+        }
+        .accordion-body.open {
+            max-height: 9999px;
+            gap: 0.45rem;
+            padding: 0.6rem;
+        }
+
+        /* ── ROUTE CARD ── */
+        .route-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.65rem 0.85rem;
+            display: flex; flex-direction: column; gap: 0.3rem;
+            font-size: 0.82rem;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .route-card:hover {
+            border-color: rgba(99,102,241,0.4);
+            box-shadow: 0 2px 10px rgba(99,102,241,0.08);
+        }
+
+        .card-top {
+            display: flex; justify-content: space-between;
+            align-items: center; gap: 0.5rem; flex-wrap: wrap;
+        }
+        .card-dest   { font-weight: 600; font-size: 0.88rem; color: var(--text-main); }
+        .card-badges { display: flex; gap: 0.3rem; align-items: center; flex-shrink: 0; }
+        .card-hora {
+            font-size: 0.72rem; color: #818cf8;
+            background: rgba(99,102,241,0.12); padding: 0.1rem 0.45rem; border-radius: 99px;
+        }
+        .card-tipo {
+            font-size: 0.68rem; background: rgba(99,102,241,0.15); color: #a5b4fc;
+            padding: 0.1rem 0.4rem; border-radius: 99px; font-weight: 500;
+        }
+
+        .card-row {
+            display: flex; align-items: center; gap: 0.35rem;
+            color: var(--text-muted); flex-wrap: wrap; line-height: 1.5;
+        }
+        .card-row b { color: #d1d5db; font-weight: 500; }
+        .card-sep   { color: #4b5563; }
+        .card-obs   { color: #fbbf24; }
+        .card-none  { color: #4b5563; font-style: italic; }
+
+        /* ── FOOTER ── */
+        .footer {
+            position: fixed; bottom: 0; left: 0; right: 0; text-align: center;
+            padding: 0.65rem; background: linear-gradient(to top, rgba(0,0,0,0.45), transparent);
+            color: var(--text-muted); font-size: 0.7rem; line-height: 1.5; pointer-events: none;
+        }
+        .footer a { color: var(--text-muted); text-decoration: none; transition: color 0.3s; pointer-events: all; }
+        .footer a:hover { color: var(--primary); }
     </style>
 </head>
 <body>
+<div class="container">
 
-    </div>    
-    <div class="container">
-        <a href="{{ url_for('start') }}" class="nav-link">← Volver al Menú</a>
-        
-        <div style="text-align: center; margin-bottom: 1rem; padding: 0 2.5rem; margin-top: 1rem;">
-            <span style="display: inline-block; background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.3); color: #818cf8; padding: 0.35rem 1rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; box-shadow: 0 0 10px rgba(99,102,241,0.1);">
-                🚀 Web App en fase de desarrollo
-            </span>
-        </div>
+    <a href="{{ url_for('start') }}" class="nav-link">← Menú</a>
 
-        <div class="header">
-            <h1>Visor de Rutas</h1>
-            {% if status == 'loaded' %}
-                <div class="badge info">🕒 Último CSV cargado: {{ upload_time }}</div>
-            {% endif %}
-        </div>
+    <div style="text-align:center; margin-bottom:0.9rem;">
+        <span style="display:inline-block; background:rgba(99,102,241,0.1); border:1px solid rgba(99,102,241,0.3); color:#818cf8; padding:0.28rem 0.9rem; border-radius:999px; font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:1.5px;">
+            🚀 Web App en fase de desarrollo
+        </span>
+    </div>
 
-        {% if status == 'empty' or status == 'error' %}
-            <div class="empty-state">
-                <h2>⚠️ Ningún archivo cargado</h2>
-                <p>{{ message | default('Primero un administrador debe cargar el CSV para poder visualizar las rutas.') }}</p>
-                <a href="{{ url_for('start') }}" class="btn-home">Ir al Inicio</a>
-            </div>
-        {% else %}
-            <div class="tabs">
-                <button class="tab-btn active" onclick="switchView('cpt')">Ver por CPT</button>
-                <button class="tab-btn" onclick="switchView('zonas')">Ver por Zonas</button>
-            </div>
-
-            <!-- VISTA POR CPT -->
-            <div id="view-cpt" class="view-section active">
-                {% for etd, group in cpt_groups.items() %}
-                    {% if group.rows|length > 0 %}
-                    <h3 class="table-title">{{ group.title }}</h3>
-                    <div class="table-responsive">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Destino</th>
-                                    <th>MLP</th>
-                                    <th>Conductor 1</th>
-                                    <th>Conductor 2</th>
-                                    <th>Tracto</th>
-                                    <th>Rampla</th>
-                                    <th>Tipo</th>
-                                    <th>Observaciones</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for row in group.rows %}
-                                <tr>
-                                    <td>{{ loop.index }}</td>
-                                    <td>{{ row.destino }}</td>
-                                    <td>{{ row.mlp }}</td>
-                                    <td>{{ row.cond1 }}</td>
-                                    <td>{{ row.cond2 }}</td>
-                                    <td>{{ row.tracto }}</td>
-                                    <td>{{ row.rampla }}</td>
-                                    <td>{{ row.tipo }}</td>
-                                    <td>{{ row.observaciones }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    {% endif %}
-                {% endfor %}
-            </div>
-
-            <!-- VISTA POR ZONAS -->
-            <div id="view-zonas" class="view-section">
-                {% for zona_name, rows in zona_groups.items() %}
-                    {% if rows|length > 0 %}
-                    <h3 class="table-title">Rutas - {{ zona_name }}</h3>
-                    <div class="table-responsive">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Destino</th>
-                                    <th>MLP</th>
-                                    <th>Conductor 1</th>
-                                    <th>Conductor 2</th>
-                                    <th>Tracto</th>
-                                    <th>Rampla</th>
-                                    <th>Hora de Salida</th>
-                                    <th>Observaciones</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for row in rows %}
-                                <tr>
-                                    <td>{{ loop.index }}</td>
-                                    <td>{{ row.destino }}</td>
-                                    <td>{{ row.mlp }}</td>
-                                    <td>{{ row.cond1 }}</td>
-                                    <td>{{ row.cond2 }}</td>
-                                    <td>{{ row.tracto }}</td>
-                                    <td>{{ row.rampla }}</td>
-                                    <td>{{ row.hora_salida }}</td>
-                                    <td>{{ row.observaciones }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    {% endif %}
-                {% endfor %}
-            </div>
+    <div class="header">
+        <h1>Visor de Rutas</h1>
+        {% if status == 'loaded' %}
+            <div class="badge-info">🕒 Último CSV: {{ upload_time }}</div>
         {% endif %}
-
     </div>
 
-    <script>
-        function switchView(viewId) {
-            // Eliminar active de todos los tabs
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active'));
+    {% if status == 'empty' or status == 'error' %}
+        <div class="empty-state">
+            <h2>⚠️ Ningún archivo cargado</h2>
+            <p>{{ message | default('Primero un administrador debe cargar el CSV para poder visualizar las rutas.') }}</p>
+            <a href="{{ url_for('start') }}" class="btn-home">Ir al Inicio</a>
+        </div>
 
-            // Añadir active al tab clicado
-            event.target.classList.add('active');
-            document.getElementById('view-' + viewId).classList.add('active');
-        }
-    </script>
+    {% else %}
 
-    <div style="position: fixed; bottom: 0; left: 0; right: 0; text-align: center; padding: 1rem; background: linear-gradient(to top, rgba(0,0,0,0.3), transparent); color: var(--text-muted); font-size: 0.75rem; line-height: 1.4; pointer-events: none;">
-        Diseñado y desarrollado por <span style="color: var(--primary); font-weight: 500;">Miguel Torres</span><br>
-        <a href="mailto:miguel.torresdev@gmail.com" style="color: var(--text-muted); text-decoration: none; transition: color 0.3s ease; pointer-events: all;" onmouseover="this.style.color='#6366f1'" onmouseout="this.style.color='#9ca3af'">miguel.torresdev@gmail.com</a>
-    </div>
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchView('cpt', this)">🕐 Ver por CPT</button>
+            <button class="tab-btn"        onclick="switchView('zonas', this)">📍 Ver por Zonas</button>
+        </div>
+
+        {# ══════════════════════════════════
+           VISTA POR CPT
+           ══════════════════════════════════ #}
+        <div id="view-cpt" class="view-section active">
+            {% for etd_val, group in cpt_groups.items() %}
+            {% if group.dest_groups %}
+
+            <h3 class="group-title">🕐 {{ group.title }}</h3>
+
+            {% for base_dest, dg in group.dest_groups.items() %}
+            <div class="accordion">
+                <button class="accordion-header" onclick="toggleAcc(this)">
+                    <div class="acc-left">
+                        <span class="acc-dest">{{ dg.label }}</span>
+                        <span class="acc-count">{{ dg.rows|length }} ruta{% if dg.rows|length != 1 %}s{% endif %}</span>
+                    </div>
+                    <span class="acc-arrow">▶</span>
+                </button>
+                <div class="accordion-body">
+                    {% for row in dg.rows %}
+                    <div class="route-card">
+                        <div class="card-top">
+                            <span class="card-dest">{{ row.destino }}</span>
+                            <div class="card-badges">
+                                {% if row.tipo %}<span class="card-tipo">{{ row.tipo }}</span>{% endif %}
+                            </div>
+                        </div>
+                        <div class="card-row">
+                            🚛 <b>{{ row.tracto if row.tracto else '' }}</b>
+                            {% if not row.tracto %}<span class="card-none">sin tracto</span>{% endif %}
+                            <span class="card-sep">·</span>
+                            📦 <b>{{ row.rampla if row.rampla else '' }}</b>
+                            {% if not row.rampla %}<span class="card-none">sin rampla</span>{% endif %}
+                        </div>
+                        <div class="card-row">
+                            👤
+                            {% if row.cond1 %}{{ row.cond1 }}{% else %}<span class="card-none">—</span>{% endif %}
+                            {% if row.cond2 and row.cond2.strip() %}
+                                <span class="card-sep">/</span> {{ row.cond2 }}
+                            {% endif %}
+                        </div>
+                        <div class="card-row">
+                            🏢 {{ row.mlp }}
+                            {% if row.observaciones %}
+                                <span class="card-sep">·</span>
+                                <span class="card-obs">📝 {{ row.observaciones }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+
+            {% endif %}
+            {% endfor %}
+        </div>
+
+        {# ══════════════════════════════════
+           VISTA POR ZONAS
+           ══════════════════════════════════ #}
+        <div id="view-zonas" class="view-section">
+            {% for zona_name, dest_groups in zona_groups.items() %}
+            {% if dest_groups %}
+
+            <h3 class="group-title">📍 {{ zona_name }}</h3>
+
+            {% for base_dest, dg in dest_groups.items() %}
+            <div class="accordion">
+                <button class="accordion-header" onclick="toggleAcc(this)">
+                    <div class="acc-left">
+                        <span class="acc-dest">{{ dg.label }}</span>
+                        <span class="acc-count">{{ dg.rows|length }} ruta{% if dg.rows|length != 1 %}s{% endif %}</span>
+                        {% if dg.salidas %}
+                        <span class="acc-salidas">🕐 {{ dg.salidas | join(' · ') }}</span>
+                        {% endif %}
+                    </div>
+                    <span class="acc-arrow">▶</span>
+                </button>
+                <div class="accordion-body">
+                    {% for row in dg.rows %}
+                    <div class="route-card">
+                        <div class="card-top">
+                            <span class="card-dest">{{ row.destino }}</span>
+                            <div class="card-badges">
+                                {% if row.tipo %}<span class="card-tipo">{{ row.tipo }}</span>{% endif %}
+                                <span class="card-hora">🕐 {{ row.hora_salida }}</span>
+                            </div>
+                        </div>
+                        <div class="card-row">
+                            🚛 <b>{{ row.tracto if row.tracto else '' }}</b>
+                            {% if not row.tracto %}<span class="card-none">sin tracto</span>{% endif %}
+                            <span class="card-sep">·</span>
+                            📦 <b>{{ row.rampla if row.rampla else '' }}</b>
+                            {% if not row.rampla %}<span class="card-none">sin rampla</span>{% endif %}
+                        </div>
+                        <div class="card-row">
+                            👤
+                            {% if row.cond1 %}{{ row.cond1 }}{% else %}<span class="card-none">—</span>{% endif %}
+                            {% if row.cond2 and row.cond2.strip() %}
+                                <span class="card-sep">/</span> {{ row.cond2 }}
+                            {% endif %}
+                        </div>
+                        <div class="card-row">
+                            🏢 {{ row.mlp }}
+                            {% if row.observaciones %}
+                                <span class="card-sep">·</span>
+                                <span class="card-obs">📝 {{ row.observaciones }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+
+            {% endif %}
+            {% endfor %}
+        </div>
+
+    {% endif %}
+</div>
+
+<div class="footer">
+    Diseñado y desarrollado por <span style="color:var(--primary);font-weight:500;">Miguel Torres</span><br>
+    <a href="mailto:miguel.torresdev@gmail.com">miguel.torresdev@gmail.com</a>
+</div>
+
+<script>
+    function toggleAcc(header) {
+        header.classList.toggle('open');
+        header.nextElementSibling.classList.toggle('open');
+    }
+
+    function switchView(viewId, btn) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('view-' + viewId).classList.add('active');
+    }
+</script>
 </body>
 </html>

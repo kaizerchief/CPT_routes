@@ -322,8 +322,16 @@
                 </label>
             </div>
 
+            <div class="toggle-group">
+                <span class="toggle-label">Generar PDF</span>
+                <label class="switch">
+                    <input type="checkbox" name="generar_pdf" id="generar_pdf" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+
             <button type="submit" class="btn-submit" id="submitBtn">
-                <span>Generar PDF</span>
+                <span id="submitLabel">Generar PDF</span>
                 <div class="loading" id="loadingSpinner"></div>
             </button>
         </form>
@@ -346,24 +354,42 @@
             document.getElementById('file-name-display').textContent = fileName;
         });
 
-        // Mostrar un pequeño efecto de carga al enviar
+        // Actualizar texto del botón según estado del toggle PDF
+        const pdfToggle = document.getElementById('generar_pdf');
+        const submitLabel = document.getElementById('submitLabel');
+        function updateBtnLabel() {
+            submitLabel.textContent = pdfToggle.checked ? 'Generar PDF' : 'Cargar Rutas';
+        }
+        pdfToggle.addEventListener('change', updateBtnLabel);
+        updateBtnLabel();
+
+        // Enviar formulario
         document.getElementById('generadorForm').addEventListener('submit', function(e) {
             e.preventDefault();
             const form = this;
             const formData = new FormData(form);
-            
+            const generaPdf = pdfToggle.checked;
+
             setTimeout(() => {
-                document.getElementById('submitBtn').querySelector('span').textContent = 'Generando...';
+                submitLabel.textContent = generaPdf ? 'Generando...' : 'Cargando...';
                 document.getElementById('loadingSpinner').style.display = 'block';
-                
-                // Enviar el formulario vía fetch para manejar la respuesta
+
                 fetch(form.action, {
                     method: 'POST',
                     body: formData
                 })
                 .then(response => {
-                    if (response.ok) {
-                        // Si es un PDF, descargar
+                    if (!response.ok) throw new Error('Error del servidor');
+                    const contentType = response.headers.get('Content-Type') || '';
+                    if (contentType.includes('application/json')) {
+                        // Sin PDF: solo mostrar éxito
+                        return response.json().then(() => {
+                            document.getElementById('successMessage').style.display = 'block';
+                            updateBtnLabel();
+                            document.getElementById('loadingSpinner').style.display = 'none';
+                        });
+                    } else {
+                        // Con PDF: descargar
                         return response.blob().then(blob => {
                             const url = window.URL.createObjectURL(blob);
                             const a = document.createElement('a');
@@ -373,19 +399,15 @@
                             a.click();
                             window.URL.revokeObjectURL(url);
                             document.body.removeChild(a);
-                            
-                            // Mostrar mensaje de éxito
                             document.getElementById('successMessage').style.display = 'block';
-                            document.getElementById('submitBtn').querySelector('span').textContent = 'Generar PDF';
+                            updateBtnLabel();
                             document.getElementById('loadingSpinner').style.display = 'none';
                         });
-                    } else {
-                        throw new Error('Error al generar el PDF');
                     }
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    document.getElementById('submitBtn').querySelector('span').textContent = 'Generar PDF';
+                    updateBtnLabel();
                     document.getElementById('loadingSpinner').style.display = 'none';
                     alert('Error al procesar el archivo. Intenta nuevamente.');
                 });
