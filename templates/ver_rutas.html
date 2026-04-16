@@ -215,6 +215,154 @@
         .card-obs   { color: #fbbf24; }
         .card-none  { color: #4b5563; font-style: italic; }
 
+        /* ── SUMMARY PANEL ── */
+        .summary-wrapper {
+            margin-bottom: 1.25rem;
+        }
+
+        .summary-toggle {
+            width: 100%;
+            background: rgba(99,102,241,0.08);
+            border: 1px solid rgba(99,102,241,0.25);
+            color: #a5b4fc;
+            padding: 0.6rem 1rem;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 0.88rem;
+            font-weight: 500;
+            font-family: 'Outfit', sans-serif;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s ease;
+            text-align: left;
+        }
+        .summary-toggle:hover {
+            background: rgba(99,102,241,0.14);
+            border-color: rgba(99,102,241,0.45);
+        }
+        .summary-toggle.open {
+            border-bottom-left-radius: 0;
+            border-bottom-right-radius: 0;
+            border-bottom-color: transparent;
+        }
+        .summary-arrow {
+            font-size: 0.7rem;
+            transition: transform 0.3s ease;
+            flex-shrink: 0;
+        }
+        .summary-toggle.open .summary-arrow {
+            transform: rotate(180deg);
+        }
+
+        .summary-body {
+            overflow: hidden;
+            max-height: 0;
+            transition: max-height 0.35s ease, padding 0.3s ease;
+            background: rgba(10, 12, 16, 0.5);
+            border: 1px solid rgba(99,102,241,0.25);
+            border-top: none;
+            border-bottom-left-radius: 10px;
+            border-bottom-right-radius: 10px;
+            padding: 0 1rem;
+        }
+        .summary-body.open {
+            max-height: 1200px;
+            padding: 0.9rem 1rem;
+        }
+
+        .summary-total {
+            font-size: 0.9rem;
+            color: var(--text-main);
+            margin-bottom: 0.85rem;
+            padding-bottom: 0.7rem;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .summary-total strong {
+            color: #a5b4fc;
+            font-size: 1.05rem;
+        }
+
+        .summary-cols {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+        @media (max-width: 480px) {
+            .summary-cols { grid-template-columns: 1fr; }
+        }
+
+        .summary-section-title {
+            font-size: 0.68rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #818cf8;
+            margin-bottom: 0.45rem;
+        }
+
+        /* CPT chips — fila horizontal */
+        .summary-cpt-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            margin-bottom: 0.9rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .summary-cpt-chip {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            background: rgba(46,64,83,0.6);
+            border: 1px solid rgba(99,102,241,0.2);
+            border-radius: 8px;
+            padding: 0.25rem 0.6rem;
+            font-size: 0.78rem;
+            color: var(--text-muted);
+        }
+
+        /* Destination grid — 2 columns of zones */
+        .summary-zone-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem 1.25rem;
+        }
+        @media (max-width: 440px) {
+            .summary-zone-grid  { grid-template-columns: 1fr; }
+            .summary-cpt-chip   { flex: 1 1 auto; }
+        }
+        .summary-zone-title {
+            font-size: 0.65rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.7px;
+            color: #818cf8;
+            margin-bottom: 0.3rem;
+            padding-bottom: 0.2rem;
+            border-bottom: 1px solid rgba(99,102,241,0.15);
+        }
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.22rem 0;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            border-bottom: 1px solid rgba(255,255,255,0.025);
+        }
+        .summary-row:last-child { border-bottom: none; }
+        .summary-badge {
+            background: rgba(99,102,241,0.18);
+            color: #a5b4fc;
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 0.05rem 0.45rem;
+            border-radius: 99px;
+            flex-shrink: 0;
+            margin-left: 0.4rem;
+        }
+
         /* ── FOOTER ── */
         .footer {
             position: fixed; bottom: 0; left: 0; right: 0; text-align: center;
@@ -242,6 +390,51 @@
             <div class="badge-info">🕒 Último CSV: {{ upload_time }}</div>
         {% endif %}
     </div>
+
+    {% if status == 'loaded' %}
+        <!-- ── RESUMEN COLAPSABLE ── -->
+        <div class="summary-wrapper">
+            <button class="summary-toggle" id="summaryToggle" onclick="toggleSummary()">
+                <span>📊 Resumen &nbsp;·&nbsp; <strong style="color:var(--text-main)">{{ resumen.total }}</strong> rutas totales</span>
+                <span class="summary-arrow">▼</span>
+            </button>
+            <div class="summary-body" id="summaryBody">
+
+                <!-- Total -->
+                <div class="summary-total">
+                    Total de rutas: <strong>{{ resumen.total }}</strong>
+                </div>
+
+                <!-- Por CPT: chips horizontales -->
+                <div class="summary-section-title">Por CPT</div>
+                <div class="summary-cpt-row">
+                    {% for item in resumen.por_cpt %}
+                    <div class="summary-cpt-chip">
+                        <span>{{ item.title }}</span>
+                        <span class="summary-badge">{{ item.count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <!-- Por Destino agrupado por Zona: 2 columnas -->
+                <div class="summary-section-title">Por Destino</div>
+                <div class="summary-zone-grid">
+                    {% for zona_name, items in resumen.por_zona.items() %}
+                    <div>
+                        <div class="summary-zone-title">{{ zona_name }}</div>
+                        {% for item in items %}
+                        <div class="summary-row">
+                            <span>{{ item.destino }}</span>
+                            <span class="summary-badge">{{ item.count }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                </div>
+
+            </div>
+        </div>
+    {% endif %}
 
     {% if status == 'empty' or status == 'error' %}
         <div class="empty-state">
@@ -389,6 +582,13 @@
     function toggleAcc(header) {
         header.classList.toggle('open');
         header.nextElementSibling.classList.toggle('open');
+    }
+
+    function toggleSummary() {
+        const btn  = document.getElementById('summaryToggle');
+        const body = document.getElementById('summaryBody');
+        btn.classList.toggle('open');
+        body.classList.toggle('open');
     }
 
     function switchView(viewId, btn) {

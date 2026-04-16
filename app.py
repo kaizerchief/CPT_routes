@@ -192,7 +192,7 @@ def ver_rutas():
         "Zona Sur":           ["SBB1","SBB2","SNU1","STM1","SVL1"],
         "Zona Centro":        ["SVP3","SIL1","STC1","SLT1","SRC1"],
         "Zona Norte":         ["SLS1","SAF1","SPO1","ELS1"],
-        "Zona Metropolitana": ["SRM2","CLCCCH","CLCBXP"],
+        "Zona Metropolitana": ["SRM2","CLCCCH","CLCBXP","CLARM1"],
     }
     zona_groups = {}
     for g_name, g_dests in dest_groups_def.items():
@@ -236,9 +236,55 @@ def ver_rutas():
                 dg["salidas"].sort()
             zona_groups[g_name] = dest_groups
 
+    # --- Resumen ---
+    resumen_por_cpt = []
+    total_rutas = 0
+    for etd_val, group in cpt_groups.items():
+        count = sum(len(dg["rows"]) for dg in group["dest_groups"].values())
+        total_rutas += count
+        resumen_por_cpt.append({"title": group["title"], "count": count})
+
+    dest_counter = {}
+    for row in processed_rows:
+        if row.get("_es_segunda_vuelta"): continue
+        dest = str(row.get("Destino", "")).strip()
+        if dest:
+            dest_counter[dest] = dest_counter.get(dest, 0) + 1
+
+    _zona_defs = {
+        "Zona Sur":           ["SBB1","SBB2","SNU1","STM1","SVL1"],
+        "Zona Centro":        ["SVP3","SIL1","STC1","SLT1","SRC1"],
+        "Zona Norte":         ["SLS1","SAF1","SPO1","ELS1"],
+        "Zona Metropolitana": ["SRM2","CLCCCH","CLCBXP","CLARM1"],
+    }
+    por_zona = {z: [] for z in _zona_defs}
+    otros = []
+    for dest, count in dest_counter.items():
+        dest_upper = dest.upper()
+        matched = False
+        for zona_name, prefixes in _zona_defs.items():
+            if any(p in dest_upper for p in prefixes):
+                por_zona[zona_name].append({"destino": dest, "count": count})
+                matched = True
+                break
+        if not matched:
+            otros.append({"destino": dest, "count": count})
+    for zona in por_zona.values():
+        zona.sort(key=lambda x: x["destino"])
+    if otros:
+        por_zona["Otros"] = sorted(otros, key=lambda x: x["destino"])
+    # Eliminar zonas vacías
+    por_zona = {k: v for k, v in por_zona.items() if v}
+
+    resumen = {
+        "total":    total_rutas,
+        "por_cpt":  resumen_por_cpt,
+        "por_zona": por_zona,
+    }
+
     return render_template('ver_rutas.html', status="loaded",
         upload_time=state["upload_time"], expires_at=state.get("expires_at"),
-        cpt_groups=cpt_groups, zona_groups=zona_groups)
+        cpt_groups=cpt_groups, zona_groups=zona_groups, resumen=resumen)
 
 def procesar_csv(csv_raw_text, params):
     stream = io.StringIO(csv_raw_text, newline=None)
