@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f1115;
+            --card-bg: #1a1d24;
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --border-color: #374151;
+            --input-bg: #1f2937;
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+            background-image: radial-gradient(circle at top right, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
+                              radial-gradient(circle at bottom left, rgba(99, 102, 241, 0.1) 0%, transparent 40%);
+            background-attachment: fixed;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 2.5rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05);
+            position: relative;
+            margin-bottom: 2rem;
+        }
+
+        .nav-link {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.85rem;
+            transition: color 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .nav-link:hover {
+            color: var(--text-main);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 2rem;
+            margin-top: 1rem;
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, #a5b4fc, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            font-weight: 300;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex; gap: 0.6rem; justify-content: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 1rem; margin-bottom: 1.5rem;
+        }
+        .tab-btn {
+            background: transparent; border: 1px solid var(--border-color);
+            color: var(--text-muted); padding: 0.55rem 1.2rem;
+            border-radius: 8px; cursor: pointer; font-size: 0.88rem; font-weight: 500;
+            transition: all 0.25s ease;
+        }
+        .tab-btn:hover  { border-color: var(--primary); color: var(--text-main); }
+        .tab-btn.active {
+            background: var(--primary); color: white; border-color: var(--primary);
+            box-shadow: 0 4px 15px rgba(99,102,241,0.35);
+        }
+
+        .view-section { display: none; animation: fadeIn 0.3s ease; }
+        .view-section.active { display: block; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Forms & Inputs */
+        .form-group { margin-bottom: 1rem; }
+        .form-group label {
+            display: block; margin-bottom: 0.4rem; font-size: 0.85rem;
+            font-weight: 500; color: #d1d5db;
+        }
+        input[type="text"], select {
+            width: 100%; padding: 0.75rem 1rem;
+            background-color: var(--input-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px; color: var(--text-main);
+            font-size: 0.95rem; outline: none;
+            transition: border-color 0.3s ease;
+        }
+        input[type="text"]:focus, select:focus { border-color: var(--primary); }
+
+        button.btn-primary {
+            background: var(--primary); color: white; border: none;
+            padding: 0.75rem 1.5rem; border-radius: 8px; font-weight: 500;
+            cursor: pointer; transition: all 0.2s ease;
+        }
+        button.btn-primary:hover {
+            background: var(--primary-hover); transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+        }
+
+        button.btn-danger {
+            background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.3);
+            padding: 0.4rem 0.8rem; border-radius: 6px; font-weight: 500; font-size: 0.8rem;
+            cursor: pointer; transition: all 0.2s ease;
+        }
+        button.btn-danger:hover {
+            background: var(--danger); color: white;
+        }
+
+        /* Tables / Lists */
+        .data-table {
+            width: 100%; border-collapse: collapse; margin-top: 1rem;
+            font-size: 0.88rem;
+        }
+        .data-table th, .data-table td {
+            padding: 0.75rem 1rem; text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .data-table th { color: #a5b4fc; font-weight: 500; }
+        .data-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+        .search-bar {
+            margin-bottom: 1rem; position: relative;
+        }
+        .search-bar input {
+            padding-left: 2.5rem;
+        }
+        .search-icon {
+            position: absolute; left: 1rem; top: 50%; transform: translateY(-50%);
+            color: var(--text-muted);
+        }
+        
+        .flex-row { display: flex; gap: 1rem; align-items: flex-end; }
+        .flex-col { flex: 1; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div style="position: absolute; top: 20px; right: 25px; display: flex; gap: 15px;">
+            <a href="{{ url_for('upload') }}" class="nav-link">← Volver al Menú</a>
+            <a href="{{ url_for('logout') }}" class="nav-link">Cerrar sesión 🚪</a>
+        </div>
+
+        <div class="header">
+            <h1>Panel de Administración</h1>
+            <p>Gestiona los conductores y rutas adicionales</p>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchView('drivers', this)">👤 Conductores</button>
+            <button class="tab-btn"        onclick="switchView('routes', this)">🛣️ Rutas Manuales</button>
+        </div>
+
+        <!-- VISTA: CONDUCTORES -->
+        <div id="view-drivers" class="view-section active">
+            <div class="search-bar">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="driverSearch" placeholder="Buscar conductor por nombre..." onkeyup="filterDrivers()">
+            </div>
+
+            <div style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
+                <table class="data-table" id="driversTable">
+                    <thead>
+                        <tr>
+                            <th>Nombre del Conductor</th>
+                            <th style="width: 250px;">Teléfono</th>
+                            <th style="width: 100px;">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for name, phone in drivers.items() %}
+                        <tr class="driver-row">
+                            <td class="driver-name">{{ name }}</td>
+                            <td>
+                                <form action="{{ url_for('admin_update_phone') }}" method="POST" style="display: flex; gap: 0.5rem; align-items: center;">
+                                    <input type="hidden" name="name" value="{{ name }}">
+                                    <input type="text" name="phone" value="{{ phone }}" placeholder="+569..." style="padding: 0.4rem; font-size: 0.85rem;">
+                                    <button type="submit" class="btn-primary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">Guardar</button>
+                                </form>
+                            </td>
+                            <td></td>
+                        </tr>
+                        {% endfor %}
+                        {% if not drivers %}
+                        <tr><td colspan="3" style="text-align: center; color: var(--text-muted);">No hay conductores registrados aún. Procesa un CSV primero.</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- VISTA: RUTAS MANUALES -->
+        <div id="view-routes" class="view-section">
+            <div style="background: rgba(99, 102, 241, 0.05); padding: 1.5rem; border-radius: 8px; border: 1px solid rgba(99, 102, 241, 0.2); margin-bottom: 2rem;">
+                <h3 style="margin-bottom: 1rem; color: #a5b4fc; font-size: 1.1rem;">Agregar Ruta Manual</h3>
+                <form action="{{ url_for('admin_add_route') }}" method="POST">
+                    <div class="flex-row">
+                        <div class="form-group flex-col">
+                            <label>CPT (Origen ETD)</label>
+                            {% if cpt_options %}
+                            <select name="etd" required>
+                                <option value="" disabled selected>Selecciona un CPT activo...</option>
+                                {% for opt in cpt_options %}
+                                <option value="{{ opt }}">{{ opt }}</option>
+                                {% endfor %}
+                            </select>
+                            {% else %}
+                            <input type="text" name="etd" placeholder="Ej: 2026-04-28 01:20:00" required>
+                            {% endif %}
+                        </div>
+                        <div class="form-group flex-col">
+                            <label>Destino</label>
+                            <input type="text" name="destino" placeholder="Ej: SRM2(MANUAL)" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Observaciones</label>
+                        <input type="text" name="observaciones" placeholder="Ej: Viaje especial, no requiere rampla...">
+                    </div>
+                    <button type="submit" class="btn-primary" style="width: 100%;">Agregar Ruta</button>
+                </form>
+            </div>
+
+            <h3 style="margin-bottom: 1rem; color: #a5b4fc; font-size: 1.1rem;">Rutas Manuales Activas</h3>
+            <div style="border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden;">
+                <table class="data-table" style="margin-top: 0;">
+                    <thead style="background: rgba(255,255,255,0.02);">
+                        <tr>
+                            <th>Destino</th>
+                            <th>CPT (ETD)</th>
+                            <th>Observaciones</th>
+                            <th style="width: 80px;">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for route in manual_routes %}
+                        <tr>
+                            <td style="font-weight: 500;">{{ route.destino }}</td>
+                            <td style="color: #a5b4fc;">{{ route.etd }}</td>
+                            <td style="color: var(--text-muted); font-size: 0.8rem;">{{ route.observaciones }}</td>
+                            <td>
+                                <form action="{{ url_for('admin_delete_route') }}" method="POST">
+                                    <input type="hidden" name="route_id" value="{{ route.id }}">
+                                    <button type="submit" class="btn-danger">Borrar</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        {% if not manual_routes %}
+                        <tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 2rem;">No hay rutas manuales activas.</td></tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function switchView(viewId, btn) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('view-' + viewId).classList.add('active');
+        }
+
+        function filterDrivers() {
+            let input = document.getElementById("driverSearch");
+            let filter = input.value.toLowerCase();
+            let rows = document.getElementsByClassName("driver-row");
+            for (let i = 0; i < rows.length; i++) {
+                let name = rows[i].getElementsByClassName("driver-name")[0].innerText.toLowerCase();
+                if (name.includes(filter)) {
+                    rows[i].style.display = "";
+                } else {
+                    rows[i].style.display = "none";
+                }
+            }
+        }
+    </script>
+</body>
+</html>

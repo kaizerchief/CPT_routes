@@ -18,6 +18,8 @@ if not db:
     os.makedirs(FALLBACK_DIR, exist_ok=True)
 
 STATE_KEY   = "routes:latest"
+DRIVERS_KEY = "drivers:data"
+MANUAL_ROUTES_KEY = "routes:manual"
 TTL_SECONDS = 12 * 60 * 60  # 12 horas
 
 def save_routes_state(csv_content, params):
@@ -55,6 +57,66 @@ def delete_routes_state():
         path = os.path.join(FALLBACK_DIR, "state.json")
         if os.path.exists(path):
             os.remove(path)
+
+def get_drivers():
+    if db: return db.hgetall(DRIVERS_KEY) or {}
+    path = os.path.join(FALLBACK_DIR, "drivers.json")
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f: return json.load(f)
+    return {}
+
+def update_driver_phone(name, phone):
+    if db: db.hset(DRIVERS_KEY, name, phone)
+    else:
+        d = get_drivers()
+        d[name] = phone
+        with open(os.path.join(FALLBACK_DIR, "drivers.json"), "w", encoding="utf-8") as f:
+            json.dump(d, f, ensure_ascii=False)
+
+def update_drivers_bulk(new_drivers):
+    if not new_drivers: return
+    if db:
+        existing = db.hgetall(DRIVERS_KEY) or {}
+        to_update = {k: "" for k in new_drivers if k not in existing}
+        if to_update: db.hset(DRIVERS_KEY, mapping=to_update)
+    else:
+        d = get_drivers()
+        updated = False
+        for k in new_drivers:
+            if k not in d:
+                d[k] = ""
+                updated = True
+        if updated:
+            with open(os.path.join(FALLBACK_DIR, "drivers.json"), "w", encoding="utf-8") as f:
+                json.dump(d, f, ensure_ascii=False)
+
+def get_manual_routes():
+    if db:
+        data = db.get(MANUAL_ROUTES_KEY)
+        return json.loads(data) if data else []
+    path = os.path.join(FALLBACK_DIR, "manual_routes.json")
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f: return json.load(f)
+    return []
+
+def save_manual_routes(routes):
+    payload = json.dumps(routes, ensure_ascii=False)
+    if db: db.set(MANUAL_ROUTES_KEY, payload)
+    else:
+        with open(os.path.join(FALLBACK_DIR, "manual_routes.json"), "w", encoding="utf-8") as f:
+            f.write(payload)
+
+def add_manual_route(route_data):
+    routes = get_manual_routes()
+    import uuid
+    route_data['id'] = str(uuid.uuid4())
+    routes.append(route_data)
+    save_manual_routes(routes)
+
+def delete_manual_route(route_id):
+    routes = get_manual_routes()
+    routes = [r for r in routes if r.get('id') != route_id]
+    save_manual_routes(routes)
 
 # --- Flask ---
 from reportlab.lib.pagesizes import letter
@@ -148,6 +210,26 @@ def ver_rutas():
         return render_template('ver_rutas.html', status="empty",
                                message="No se encontraron registros tras aplicar los filtros guardados.")
 
+    drivers_dict = get_drivers()
+    manual_routes = get_manual_routes()
+    
+    # Inject manual routes into processed_rows
+    for mr in manual_routes:
+        mock_row = {
+            "Destino": mr.get("destino", ""),
+            "Transportista": "Ruta Manual",
+            "Nombre del Conductor 1": "",
+            "Nombre del Conductor 2": "",
+            "Vehiculo tractor": "",
+            "Vehiculo de carga 1": "",
+            "Tipo de Vehiculo": "",
+            "Origen ETD": mr.get("etd", ""),
+            "_es_segunda_vuelta": False,
+            "Servicio": "",
+            "observaciones_manuales": mr.get("observaciones", "")
+        }
+        processed_rows.append(mock_row)
+
     def get_base_dest(dest):
         """Extrae el prefijo base del destino (p.ej. 'SBB1' de 'SBB1(2COND)' o 'SRM2' de 'SRM2_DEDICADO')."""
         m = re.match(r'^([A-Za-z0-9]+)', str(dest).strip().upper())
@@ -163,6 +245,8 @@ def ver_rutas():
         tipo = "LH" if tipo_raw in ["RAMPLA","RAMPLA CORTA"] else ("3/4" if tipo_raw=="CARRO" else tipo_raw)
         rampla_val = str(row.get("Vehiculo de carga 1",""))
         obs_list = ["Cortina"] if rampla_val.strip() in ramplas_set else []
+        obs_manual = row.get("observaciones_manuales")
+        if obs_manual: obs_list.append(obs_manual)
         cpt_raw[etd_val]["rows"].append({
             "destino": str(row.get("Destino","")),
             "mlp":     str(row.get("Transportista","")),
@@ -210,6 +294,8 @@ def ver_rutas():
                 obs_list.append("2 vueltas")
             rampla_val = str(row.get("Vehiculo de carga 1",""))
             if rampla_val.strip() in ramplas_set: obs_list.append("Cortina")
+            obs_manual = row.get("observaciones_manuales")
+            if obs_manual: obs_list.append(obs_manual)
             zona_raw.append({
                 "destino":      str(row.get("Destino","")),
                 "mlp":          str(row.get("Transportista","")),
@@ -284,7 +370,8 @@ def ver_rutas():
 
     return render_template('ver_rutas.html', status="loaded",
         upload_time=state["upload_time"], expires_at=state.get("expires_at"),
-        cpt_groups=cpt_groups, zona_groups=zona_groups, resumen=resumen)
+        cpt_groups=cpt_groups, zona_groups=zona_groups, resumen=resumen,
+        drivers=drivers_dict, logged_in=session.get('logged_in', False))
 
 def procesar_csv(csv_raw_text, params):
     stream = io.StringIO(csv_raw_text, newline=None)
@@ -336,6 +423,15 @@ def procesar_csv(csv_raw_text, params):
         else:
             row["_es_segunda_vuelta"]=False; processed_rows.append(row)
     processed_rows.sort(key=lambda r: r.get("Origen ETD",""))
+
+    drivers_found = set()
+    for row in processed_rows:
+        c1 = str(row.get("Nombre del Conductor 1", "")).strip()
+        c2 = str(row.get("Nombre del Conductor 2", "")).strip()
+        if c1: drivers_found.add(c1)
+        if c2: drivers_found.add(c2)
+    update_drivers_bulk(drivers_found)
+
     return processed_rows, fechas_citacion, ramplas_set
 
 @app.route('/generar', methods=['POST'])
@@ -453,6 +549,55 @@ def generar():
     return send_file(pdf_buffer, as_attachment=True,
         download_name=f"Rutas_CLRM03_{datetime.datetime.now().strftime('%d-%m')}.pdf",
         mimetype='application/pdf')
+
+@app.route('/admin')
+def admin():
+    if not session.get('logged_in'): return redirect(url_for('login'))
+    drivers = get_drivers()
+    manual_routes = get_manual_routes()
+    
+    state = get_routes_state()
+    cpt_options = []
+    if state and state.get("csv_content"):
+        try:
+            processed_rows, _, _ = procesar_csv(state["csv_content"], state["params"])
+            etds = set(r.get("Origen ETD","").strip() for r in processed_rows if r.get("Origen ETD"))
+            cpt_options = sorted(list(etds))
+        except Exception:
+            pass
+            
+    return render_template('admin.html', drivers=drivers, manual_routes=manual_routes, cpt_options=cpt_options)
+
+@app.route('/admin/update_phone', methods=['POST'])
+def admin_update_phone():
+    if not session.get('logged_in'): return "No autorizado", 401
+    name = request.form.get('name')
+    phone = request.form.get('phone')
+    if name is not None:
+        update_driver_phone(name, phone)
+    return redirect(url_for('admin'))
+
+@app.route('/admin/add_route', methods=['POST'])
+def admin_add_route():
+    if not session.get('logged_in'): return "No autorizado", 401
+    etd = request.form.get('etd')
+    destino = request.form.get('destino')
+    observaciones = request.form.get('observaciones', '')
+    if etd and destino:
+        add_manual_route({
+            "etd": etd,
+            "destino": destino,
+            "observaciones": observaciones
+        })
+    return redirect(url_for('admin'))
+
+@app.route('/admin/delete_route', methods=['POST'])
+def admin_delete_route():
+    if not session.get('logged_in'): return "No autorizado", 401
+    route_id = request.form.get('route_id')
+    if route_id:
+        delete_manual_route(route_id)
+    return redirect(url_for('admin'))
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

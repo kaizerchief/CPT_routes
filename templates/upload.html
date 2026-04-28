@@ -267,7 +267,10 @@
 <body>
 
     <div class="container">
-        <a href="{{ url_for('logout') }}" class="nav-link">Cerrar sesión 🚪</a>
+        <div style="position: absolute; top: 20px; right: 25px; display: flex; gap: 15px;">
+            <a href="{{ url_for('admin') }}" class="nav-link" style="position: static; color: var(--primary);">Panel Admin ⚙️</a>
+            <a href="{{ url_for('logout') }}" class="nav-link" style="position: static;">Cerrar sesión 🚪</a>
+        </div>
         
             <div style="text-align: center; margin-bottom: 1rem; padding: 0 2.5rem; margin-top: 1rem;">
                 <span style="display: inline-block; background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.3); color: #818cf8; padding: 0.35rem 1rem; border-radius: 999px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; box-shadow: 0 0 10px rgba(99,102,241,0.1);">
