@@ -290,7 +290,7 @@ def ver_rutas():
             tipo_raw = str(row.get("Tipo de Vehiculo","")).strip().upper()
             tipo = "LH" if tipo_raw in ["RAMPLA","RAMPLA CORTA"] else ("3/4" if tipo_raw=="CARRO" else tipo_raw)
             obs_list = []
-            if "SRM2" in dest_val and "DEDICADO" in str(row.get("Servicio","")).upper():
+            if "SRM2" in dest_val:
                 obs_list.append("2 vueltas")
             rampla_val = str(row.get("Vehiculo de carga 1",""))
             if rampla_val.strip() in ramplas_set: obs_list.append("Cortina")
@@ -412,14 +412,10 @@ def procesar_csv(csv_raw_text, params):
             eta_val2 = row.get("Origen ETA","").strip()
             dp = (f"{etd_val.split(' ')[0]} " if " " in etd_val
                   else (f"{eta_val2.split(' ')[0]} " if " " in eta_val2 else ""))
-            if "DEDICADO" in str(row.get("Servicio","")).upper():
-                r1=dict(row); r2=dict(row)
-                r1["Origen ETD"]=f"{dp}01:20:00"; r1["_es_segunda_vuelta"]=False
-                r2["Origen ETD"]=f"{dp}05:20:00"; r2["_es_segunda_vuelta"]=True
-                processed_rows.extend([r1,r2])
-            else:
-                row["Origen ETD"]=f"{dp}01:20:00"; row["_es_segunda_vuelta"]=False
-                processed_rows.append(row)
+            r1=dict(row); r2=dict(row)
+            r1["Origen ETD"]=f"{dp}01:20:00"; r1["_es_segunda_vuelta"]=False
+            r2["Origen ETD"]=f"{dp}05:20:00"; r2["_es_segunda_vuelta"]=True
+            processed_rows.extend([r1,r2])
         else:
             row["_es_segunda_vuelta"]=False; processed_rows.append(row)
     processed_rows.sort(key=lambda r: r.get("Origen ETD",""))
