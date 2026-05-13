@@ -1,4 +1,4 @@
-import os, io, csv, json, datetime, redis, tempfile, re
+import os, io, csv, json, datetime, redis, tempfile, re, hashlib
 from flask import Flask, render_template, request, send_file, session, redirect, url_for
 
 # --- Vercel KV (Upstash Redis) ---
@@ -20,7 +20,40 @@ if not db:
 STATE_KEY   = "routes:latest"
 DRIVERS_KEY = "drivers:data"
 MANUAL_ROUTES_KEY = "routes:manual"
+ROUTE_STATUS_KEY = "routes:status"
 TTL_SECONDS = 12 * 60 * 60  # 12 horas
+
+def get_route_statuses():
+    try:
+        if db:
+            data = db.get(ROUTE_STATUS_KEY)
+            return json.loads(data) if data else {}
+        path = os.path.join(FALLBACK_DIR, "route_statuses.json")
+        if os.path.exists(path):
+            with open(path, encoding="utf-8") as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"ERR get_statuses: {e}")
+    return {}
+
+def update_route_status_db(route_id, status):
+    statuses = get_route_statuses()
+    statuses[route_id] = status
+    payload = json.dumps(statuses, ensure_ascii=False)
+    if db:
+        db.set(ROUTE_STATUS_KEY, payload, ex=TTL_SECONDS)
+    else:
+        with open(os.path.join(FALLBACK_DIR, "route_statuses.json"), "w", encoding="utf-8") as f:
+            f.write(payload)
+
+def clear_route_statuses():
+    if db:
+        db.delete(ROUTE_STATUS_KEY)
+    else:
+        path = os.path.join(FALLBACK_DIR, "route_statuses.json")
+        if os.path.exists(path):
+            try: os.remove(path)
+            except: pass
 
 def save_routes_state(csv_content, params):
     now = datetime.datetime.now()
@@ -57,6 +90,7 @@ def delete_routes_state():
         path = os.path.join(FALLBACK_DIR, "state.json")
         if os.path.exists(path):
             os.remove(path)
+    clear_route_statuses()
 
 def get_drivers():
     if db: return db.hgetall(DRIVERS_KEY) or {}
@@ -216,6 +250,7 @@ def ver_rutas():
     # Inject manual routes into processed_rows
     for mr in manual_routes:
         mock_row = {
+            "route_id": mr.get('id', ''),
             "Destino": mr.get("destino", ""),
             "Transportista": "Ruta Manual",
             "Nombre del Conductor 1": "",
@@ -229,6 +264,8 @@ def ver_rutas():
             "observaciones_manuales": mr.get("observaciones", "")
         }
         processed_rows.append(mock_row)
+
+    route_statuses = get_route_statuses()
 
     def get_base_dest(dest):
         """Extrae el prefijo base del destino (p.ej. 'SBB1' de 'SBB1(2COND)' o 'SRM2' de 'SRM2_DEDICADO')."""
@@ -248,6 +285,7 @@ def ver_rutas():
         obs_manual = row.get("observaciones_manuales")
         if obs_manual: obs_list.append(obs_manual)
         cpt_raw[etd_val]["rows"].append({
+            "route_id": str(row.get("route_id","")),
             "destino": str(row.get("Destino","")),
             "mlp":     str(row.get("Transportista","")),
             "cond1":   str(row.get("Nombre del Conductor 1","")),
@@ -297,6 +335,7 @@ def ver_rutas():
             obs_manual = row.get("observaciones_manuales")
             if obs_manual: obs_list.append(obs_manual)
             zona_raw.append({
+                "route_id":     str(row.get("route_id","")),
                 "destino":      str(row.get("Destino","")),
                 "mlp":          str(row.get("Transportista","")),
                 "cond1":        str(row.get("Nombre del Conductor 1","")),
@@ -371,7 +410,8 @@ def ver_rutas():
     return render_template('ver_rutas.html', status="loaded",
         upload_time=state["upload_time"], expires_at=state.get("expires_at"),
         cpt_groups=cpt_groups, zona_groups=zona_groups, resumen=resumen,
-        drivers=drivers_dict, logged_in=session.get('logged_in', False))
+        drivers=drivers_dict, logged_in=session.get('logged_in', False),
+        route_statuses=route_statuses)
 
 def procesar_csv(csv_raw_text, params):
     stream = io.StringIO(csv_raw_text, newline=None)
@@ -422,6 +462,9 @@ def procesar_csv(csv_raw_text, params):
 
     drivers_found = set()
     for row in processed_rows:
+        id_str = f"{row.get('Origen ETD','')}_{row.get('Destino','')}_{row.get('Transportista','')}_{row.get('Nombre del Conductor 1','')}_{row.get('Nombre del Conductor 2','')}_{row.get('Vehiculo tractor','')}_{row.get('_es_segunda_vuelta','')}"
+        row['route_id'] = hashlib.md5(id_str.encode('utf-8')).hexdigest()
+
         c1 = str(row.get("Nombre del Conductor 1", "")).strip()
         c2 = str(row.get("Nombre del Conductor 2", "")).strip()
         if c1: drivers_found.add(c1)
@@ -594,6 +637,25 @@ def admin_delete_route():
     if route_id:
         delete_manual_route(route_id)
     return redirect(url_for('admin'))
+
+@app.route('/update_route_status', methods=['POST'])
+def update_route_status():
+    from flask import jsonify
+    data = request.get_json()
+    if not data or 'route_id' not in data or 'status' not in data:
+        return jsonify({"success": False, "error": "Datos incompletos"}), 400
+    
+    route_id = data['route_id']
+    status = data['status']
+    
+    if status not in ["pending", "arrived", "departed"]:
+        return jsonify({"success": False, "error": "Estado inválido"}), 400
+        
+    try:
+        update_route_status_db(route_id, status)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

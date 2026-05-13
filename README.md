@@ -21,6 +21,8 @@ Este proyecto resuelve este problema automatizando:
   * Vista agrupada por CPT (horario de corte).
   * Vista agrupada por zonas geográficas.
   * Resumen de volumen total de rutas.
+  * **Seguimiento de Estado en Tiempo Real:** Permite marcar si la ruta está pendiente, si el camión ya llegó o si ya partió, actualizando el color de la tarjeta para una rápida identificación visual.
+  * **Conteo Dinámico por CPT:** Los encabezados se actualizan automáticamente al cambiar el estado de una ruta, mostrando `[Pendientes] - [Llegaron] - [Salieron]`.
 * **Generación de PDF:** Creación automática de un reporte en PDF utilizando `reportlab`, con formato de tablas, casillas de verificación (arribo/partida) y espacio para observaciones.
 * **Panel de Administración:**
   * Acceso protegido por contraseña.

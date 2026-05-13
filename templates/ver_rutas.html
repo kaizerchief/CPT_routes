@@ -215,6 +215,45 @@
         .card-obs   { color: #fbbf24; }
         .card-none  { color: #4b5563; font-style: italic; }
 
+        /* --- STATUS STYLES --- */
+        .route-card.status-pending { } /* default */
+        .route-card.status-arrived {
+            background-color: rgba(245, 158, 11, 0.06);
+            border-color: rgba(245, 158, 11, 0.35);
+        }
+        .route-card.status-departed {
+            background-color: rgba(16, 185, 129, 0.06);
+            border-color: rgba(16, 185, 129, 0.35);
+        }
+
+        .status-actions {
+            display: flex; gap: 0.4rem;
+            margin-top: 0.5rem; padding-top: 0.5rem;
+            border-top: 1px solid var(--border-color);
+        }
+        .btn-status {
+            flex: 1; padding: 0.35rem; border: 1px solid var(--border-color);
+            border-radius: 6px; background: rgba(255,255,255,0.05);
+            color: var(--text-muted); cursor: pointer; font-size: 0.75rem;
+            transition: all 0.2s ease; font-family: 'Outfit', sans-serif;
+        }
+        .btn-status:hover { background: rgba(255,255,255,0.1); color: var(--text-main); }
+        .btn-status.active { pointer-events: none; }
+        .btn-status.active-pending { background: rgba(156, 163, 175, 0.2); border-color: #9ca3af; color: #fff; }
+        .btn-status.active-arrived { background: rgba(245, 158, 11, 0.2); border-color: #f59e0b; color: #fcd34d; }
+        .btn-status.active-departed { background: rgba(16, 185, 129, 0.2); border-color: #10b981; color: #6ee7b7; }
+
+        .cpt-counts {
+            display: inline-flex; align-items: center; gap: 0.3rem;
+            font-size: 0.75rem; background: rgba(0,0,0,0.3);
+            padding: 0.15rem 0.6rem; border-radius: 99px;
+            margin-left: auto; font-weight: 500; border: 1px solid rgba(255,255,255,0.1);
+        }
+        .c-pend { color: #d1d5db; }
+        .c-arr  { color: #fcd34d; }
+        .c-dep  { color: #6ee7b7; }
+        .c-sep  { color: #4b5563; }
+
         /* ── SUMMARY PANEL ── */
         .summary-wrapper {
             margin-bottom: 1.25rem;
@@ -462,7 +501,14 @@
             {% for etd_val, group in cpt_groups.items() %}
             {% if group.dest_groups %}
 
-            <h3 class="group-title">🕐 {{ group.title }}</h3>
+            <h3 class="group-title">
+                <span>🕐 {{ group.title }}</span>
+                <span class="cpt-counts">
+                    <span class="c-pend">0</span> <span class="c-sep">-</span>
+                    <span class="c-arr">0</span> <span class="c-sep">-</span>
+                    <span class="c-dep">0</span>
+                </span>
+            </h3>
 
             {% for base_dest, dg in group.dest_groups.items() %}
             <div class="accordion">
@@ -475,7 +521,7 @@
                 </button>
                 <div class="accordion-body">
                     {% for row in dg.rows %}
-                    <div class="route-card">
+                    <div class="route-card status-{{ route_statuses.get(row.route_id, 'pending') }}" data-route-id="{{ row.route_id }}">
                         <div class="card-top">
                             <span class="card-dest">{{ row.destino }}</span>
                             <div class="card-badges">
@@ -517,6 +563,11 @@
                                 <span class="card-obs">📝 {{ row.observaciones }}</span>
                             {% endif %}
                         </div>
+                        <div class="status-actions">
+                            <button class="btn-status {% if route_statuses.get(row.route_id, 'pending') == 'pending' %}active active-pending{% endif %}" onclick="updateStatus('{{ row.route_id }}', 'pending', this)">🕒 Pendiente</button>
+                            <button class="btn-status {% if route_statuses.get(row.route_id, 'pending') == 'arrived' %}active active-arrived{% endif %}" onclick="updateStatus('{{ row.route_id }}', 'arrived', this)">🏢 Llegó</button>
+                            <button class="btn-status {% if route_statuses.get(row.route_id, 'pending') == 'departed' %}active active-departed{% endif %}" onclick="updateStatus('{{ row.route_id }}', 'departed', this)">🚚 Se fue</button>
+                        </div>
                     </div>
                     {% endfor %}
                 </div>
@@ -550,7 +601,7 @@
                 </button>
                 <div class="accordion-body">
                     {% for row in dg.rows %}
-                    <div class="route-card">
+                    <div class="route-card status-{{ route_statuses.get(row.route_id, 'pending') }}" data-route-id="{{ row.route_id }}">
                         <div class="card-top">
                             <span class="card-dest">{{ row.destino }}</span>
                             <div class="card-badges">
@@ -593,6 +644,11 @@
                                 <span class="card-obs">📝 {{ row.observaciones }}</span>
                             {% endif %}
                         </div>
+                        <div class="status-actions">
+                            <button class="btn-status {% if route_statuses.get(row.route_id, 'pending') == 'pending' %}active active-pending{% endif %}" onclick="updateStatus('{{ row.route_id }}', 'pending', this)">🕒 Pendiente</button>
+                            <button class="btn-status {% if route_statuses.get(row.route_id, 'pending') == 'arrived' %}active active-arrived{% endif %}" onclick="updateStatus('{{ row.route_id }}', 'arrived', this)">🏢 Llegó</button>
+                            <button class="btn-status {% if route_statuses.get(row.route_id, 'pending') == 'departed' %}active active-departed{% endif %}" onclick="updateStatus('{{ row.route_id }}', 'departed', this)">🚚 Se fue</button>
+                        </div>
                     </div>
                     {% endfor %}
                 </div>
@@ -630,6 +686,61 @@
         btn.classList.add('active');
         document.getElementById('view-' + viewId).classList.add('active');
     }
+
+    function updateStatus(routeId, status, btnElement) {
+        fetch('/update_route_status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ route_id: routeId, status: status })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.success) {
+                // Update all instances of this route card across both tabs
+                document.querySelectorAll('.route-card[data-route-id="'+routeId+'"]').forEach(card => {
+                    card.classList.remove('status-pending', 'status-arrived', 'status-departed');
+                    card.classList.add('status-' + status);
+                    
+                    const actions = card.querySelector('.status-actions');
+                    actions.querySelectorAll('.btn-status').forEach(b => {
+                        b.classList.remove('active', 'active-pending', 'active-arrived', 'active-departed');
+                    });
+                    
+                    if(status === 'pending') actions.children[0].classList.add('active', 'active-pending');
+                    else if(status === 'arrived') actions.children[1].classList.add('active', 'active-arrived');
+                    else if(status === 'departed') actions.children[2].classList.add('active', 'active-departed');
+                });
+                recalcCounts();
+            } else {
+                alert('Error al actualizar el estado: ' + data.error);
+            }
+        }).catch(e => alert('Error de red: ' + e));
+    }
+
+    function recalcCounts() {
+        document.querySelectorAll('#view-cpt > .group-title').forEach(header => {
+            let next = header.nextElementSibling;
+            let pending = 0, arrived = 0, departed = 0;
+            while(next && !next.classList.contains('group-title')) {
+                next.querySelectorAll('.route-card').forEach(card => {
+                    if(card.classList.contains('status-arrived')) arrived++;
+                    else if(card.classList.contains('status-departed')) departed++;
+                    else pending++;
+                });
+                next = next.nextElementSibling;
+            }
+            const pendEl = header.querySelector('.c-pend');
+            const arrEl = header.querySelector('.c-arr');
+            const depEl = header.querySelector('.c-dep');
+            if(pendEl) pendEl.textContent = pending;
+            if(arrEl) arrEl.textContent = arrived;
+            if(depEl) depEl.textContent = departed;
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        recalcCounts();
+    });
 </script>
 </body>
 </html>
