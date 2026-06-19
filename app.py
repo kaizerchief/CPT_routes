@@ -199,6 +199,45 @@ def cargar_ramplas():
         print(f"WARN ramplas.json no encontrado en {json_path}")
     return ramplas_set
 
+def get_destino_nombre(destino):
+    if not destino:
+        return ""
+    dest_upper = str(destino).upper()
+    if "SAF1_SIQ1_SAR1" in dest_upper:
+        return "Combinado del Norte"
+        
+    individual_mappings = [
+        ("SBB1", "Concepción"),
+        ("SBB2", "Los Angeles"),
+        ("SLS1", "La Serena"),
+        ("SPO1", "Copiapó"),
+        ("SRM2", "Maipú"),
+        ("STM1", "Temuco"),
+        ("SVL1", "Valdivia"),
+        ("CLARM1", "Aeropuerto"),
+        ("SAF1", "Antofagasta"),
+        ("SIL1", "Salamanca"),
+        ("SNU1", "Chillán"),
+        ("SRC1", "Rancagua"),
+        ("STC1", "Talca"),
+        ("SVP3", "Viña"),
+        ("SLT1", "Litueche"),
+        ("CLCBXP", "Bluexpress")
+    ]
+    
+    parts = dest_upper.split("_")
+    matched_names = []
+    for part in parts:
+        for code, name in individual_mappings:
+            if code in part:
+                if name not in matched_names:
+                    matched_names.append(name)
+                break
+                
+    if matched_names:
+        return "-".join(matched_names)
+    return ""
+
 # --- Rutas ---
 @app.route('/')
 def start(): return render_template('start.html')
@@ -499,9 +538,15 @@ def generar():
         return jsonify({"status": "ok", "message": "Rutas cargadas correctamente"})
 
     groups = {}
+    ambulancias = []
     for row in processed_rows:
-        etd_val = row.get("Origen ETD","").strip()
-        groups.setdefault(etd_val,[]).append(row)
+        mlp_val = str(row.get("Transportista", "")).strip().lower()
+        dest_val = str(row.get("Destino", "")).upper()
+        if mlp_val == "movicity" and "CLARM1" not in dest_val:
+            ambulancias.append(row)
+        else:
+            etd_val = row.get("Origen ETD","").strip()
+            groups.setdefault(etd_val,[]).append(row)
 
     pdf_buffer = io.BytesIO()
     doc = SimpleDocTemplate(pdf_buffer, pagesize=letter,
@@ -533,6 +578,9 @@ def generar():
 
     ch=[Paragraph(f"<b>{get_cpt_title(e)}</b>",sh) for e in groups]
     cv=[Paragraph(str(len(groups[e])),sc) for e in groups]
+    if ambulancias:
+        ch.append(Paragraph("<b>Ambulancias</b>", sh))
+        cv.append(Paragraph(str(len(ambulancias)), sc))
     if ch:
         ct=Table([ch,cv],hAlign='LEFT')
         ct.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.HexColor('#2E4053')),
@@ -546,6 +594,35 @@ def generar():
     col_widths=[COL_WIDTH_ID,COL_WIDTH_DESTINO,COL_WIDTH_MLP,COL_WIDTH_COND1,
                 COL_WIDTH_COND2,COL_WIDTH_TRACTO,COL_WIDTH_RAMPLA,COL_WIDTH_CORTINA,
                 COL_WIDTH_TIPO,COL_WIDTH_ARRIBO,COL_WIDTH_PARTIDA,COL_WIDTH_OBSERVACIONES]
+
+    def build_table(rows):
+        table_data=[headers]
+        for idx,row in enumerate(rows,1):
+            rd=[mp(str(idx),True)]
+            for col in REQUIRED_COLUMNS:
+                val=str(row.get(col,""))
+                if col in ["Origen ETA","Origen ETD"]: val="[   ]"
+                elif col=="Tipo de Vehiculo":
+                    vu=val.strip().upper()
+                    if vu in ["RAMPLA","RAMPLA CORTA"]: val="LH"
+                    elif vu=="CARRO": val="3/4"
+                elif col=="Destino":
+                    nombre_destino = get_destino_nombre(val)
+                    if nombre_destino:
+                        val_esc = val.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                        val = f"{val_esc}<br/><font size=6>{nombre_destino}</font>"
+                rd.append(mp(val,True))
+                if col=="Vehiculo de carga 1":
+                    rd.append(mp("SI [ ]" if val.strip() in ramplas_set else "",True))
+            rd.append(mp("",True)); table_data.append(rd)
+        t=Table(table_data,colWidths=col_widths,repeatRows=1)
+        t.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.HexColor('#2E4053')),
+            ('TEXTCOLOR',(0,0),(-1,0),colors.whitesmoke),('TEXTCOLOR',(0,1),(-1,-1),colors.black),
+            ('ALIGN',(0,0),(-1,-1),'CENTER'),('VALIGN',(0,0),(-1,-1),'MIDDLE'),
+            ('LEFTPADDING',(0,0),(-1,-1),3),('RIGHTPADDING',(0,0),(-1,-1),3),
+            ('GRID',(0,0),(-1,-1),0.5,colors.grey),
+            ('ROWBACKGROUNDS',(0,1),(-1,-1),[colors.whitesmoke,colors.white])]))
+        return t
 
     for etd_val, rows_in_group in groups.items():
         cpt_title=get_cpt_title(etd_val)
@@ -561,28 +638,14 @@ def generar():
         elif td: cpt_title=f"{cpt_title} (Salida: {td})"
         story.append(Paragraph(f"<b>{cpt_title}</b>",tts))
         rows_in_group.sort(key=lambda r: r.get("Destino",""))
-        table_data=[headers]
-        for idx,row in enumerate(rows_in_group,1):
-            rd=[mp(str(idx),True)]
-            for col in REQUIRED_COLUMNS:
-                val=str(row.get(col,""))
-                if col in ["Origen ETA","Origen ETD"]: val="[   ]"
-                elif col=="Tipo de Vehiculo":
-                    vu=val.strip().upper()
-                    if vu in ["RAMPLA","RAMPLA CORTA"]: val="LH"
-                    elif vu=="CARRO": val="3/4"
-                rd.append(mp(val,True))
-                if col=="Vehiculo de carga 1":
-                    rd.append(mp("SI [ ]" if val.strip() in ramplas_set else "",True))
-            rd.append(mp("",True)); table_data.append(rd)
-        t=Table(table_data,colWidths=col_widths,repeatRows=1)
-        t.setStyle(TableStyle([('BACKGROUND',(0,0),(-1,0),colors.HexColor('#2E4053')),
-            ('TEXTCOLOR',(0,0),(-1,0),colors.whitesmoke),('TEXTCOLOR',(0,1),(-1,-1),colors.black),
-            ('ALIGN',(0,0),(-1,-1),'CENTER'),('VALIGN',(0,0),(-1,-1),'MIDDLE'),
-            ('LEFTPADDING',(0,0),(-1,-1),3),('RIGHTPADDING',(0,0),(-1,-1),3),
-            ('GRID',(0,0),(-1,-1),0.5,colors.grey),
-            ('ROWBACKGROUNDS',(0,1),(-1,-1),[colors.whitesmoke,colors.white])]))
-        story.append(t); story.append(Spacer(1,10))
+        story.append(build_table(rows_in_group))
+        story.append(Spacer(1,10))
+
+    if ambulancias:
+        story.append(Paragraph("<b>Ambulancias</b>",tts))
+        ambulancias.sort(key=lambda r: r.get("Destino",""))
+        story.append(build_table(ambulancias))
+        story.append(Spacer(1,10))
 
     doc.build(story); pdf_buffer.seek(0)
     return send_file(pdf_buffer, as_attachment=True,
