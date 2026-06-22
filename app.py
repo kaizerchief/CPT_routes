@@ -199,6 +199,18 @@ def cargar_ramplas():
         print(f"WARN ramplas.json no encontrado en {json_path}")
     return ramplas_set
 
+def simplify_destino(destino):
+    if not destino:
+        return ""
+    dest = str(destino).strip()
+    dest_upper = dest.upper()
+    if "SAF1_SIQ1_SAR1" in dest_upper:
+        return "SAF1_SIQ1_SAR1"
+    m = re.match(r'^([A-Za-z0-9]+)', dest_upper)
+    if m:
+        return m.group(1)
+    return dest
+
 def get_destino_nombre(destino):
     if not destino:
         return ""
@@ -290,7 +302,7 @@ def ver_rutas():
     for mr in manual_routes:
         mock_row = {
             "route_id": mr.get('id', ''),
-            "Destino": mr.get("destino", ""),
+            "Destino": simplify_destino(mr.get("destino", "")),
             "Transportista": "Ruta Manual",
             "Nombre del Conductor 1": "",
             "Nombre del Conductor 2": "",
@@ -474,6 +486,9 @@ def procesar_csv(csv_raw_text, params):
     for row in valid_rows:
         sv = str(row.get("Servicio",""))
         if "_CLRM03_" in sv: row["Destino"] = sv.split("_CLRM03_")[-1]
+        
+        row["Destino"] = simplify_destino(row.get("Destino", ""))
+        
         eta_val = row.get("Origen ETA","").strip()
         if min_file_date and eta_val:
             ds = eta_val.split(" ")[0]
@@ -486,15 +501,24 @@ def procesar_csv(csv_raw_text, params):
         if eta_val:
             try: fechas_citacion.append(datetime.datetime.strptime(eta_val.split(" ")[0], "%Y-%m-%d").date())
             except ValueError: pass
-        if "SRM2" in str(row.get("Destino","")).upper():
-            etd_val = row.get("Origen ETD","").strip()
-            eta_val2 = row.get("Origen ETA","").strip()
-            dp = (f"{etd_val.split(' ')[0]} " if " " in etd_val
-                  else (f"{eta_val2.split(' ')[0]} " if " " in eta_val2 else ""))
-            r1=dict(row); r2=dict(row)
-            r1["Origen ETD"]=f"{dp}01:20:00"; r1["_es_segunda_vuelta"]=False
-            r2["Origen ETD"]=f"{dp}05:20:00"; r2["_es_segunda_vuelta"]=True
-            processed_rows.extend([r1,r2])
+            
+        mlp_val = str(row.get("Transportista", "")).strip().lower()
+        dest_val = str(row.get("Destino", "")).upper()
+        es_ambulancia = (mlp_val == "movicity" and "CLARM1" not in dest_val)
+
+        if "SRM2" in dest_val:
+            if es_ambulancia:
+                row["_es_segunda_vuelta"] = False
+                processed_rows.append(row)
+            else:
+                etd_val = row.get("Origen ETD","").strip()
+                eta_val2 = row.get("Origen ETA","").strip()
+                dp = (f"{etd_val.split(' ')[0]} " if " " in etd_val
+                      else (f"{eta_val2.split(' ')[0]} " if " " in eta_val2 else ""))
+                r1=dict(row); r2=dict(row)
+                r1["Origen ETD"]=f"{dp}01:20:00"; r1["_es_segunda_vuelta"]=False
+                r2["Origen ETD"]=f"{dp}05:20:00"; r2["_es_segunda_vuelta"]=True
+                processed_rows.extend([r1,r2])
         else:
             row["_es_segunda_vuelta"]=False; processed_rows.append(row)
     processed_rows.sort(key=lambda r: r.get("Origen ETD",""))
@@ -543,6 +567,8 @@ def generar():
         mlp_val = str(row.get("Transportista", "")).strip().lower()
         dest_val = str(row.get("Destino", "")).upper()
         if mlp_val == "movicity" and "CLARM1" not in dest_val:
+            if row.get("_es_segunda_vuelta"):
+                continue
             ambulancias.append(row)
         else:
             etd_val = row.get("Origen ETD","").strip()
@@ -688,7 +714,7 @@ def admin_add_route():
     if etd and destino:
         add_manual_route({
             "etd": etd,
-            "destino": destino,
+            "destino": simplify_destino(destino),
             "observaciones": observaciones
         })
     return redirect(url_for('admin'))
