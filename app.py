@@ -199,13 +199,25 @@ def cargar_ramplas():
         print(f"WARN ramplas.json no encontrado en {json_path}")
     return ramplas_set
 
+def is_valid_dest_code(code):
+    code_upper = code.upper()
+    return bool(re.match(r'^S[A-Z]{2}\d$', code_upper) or re.match(r'^(CL|CX)[A-Z0-9]+$', code_upper))
+
 def simplify_destino(destino):
     if not destino:
         return ""
     dest = str(destino).strip()
     dest_upper = dest.upper()
-    if "SAF1_SIQ1_SAR1" in dest_upper:
-        return "SAF1_SIQ1_SAR1"
+    
+    parts = re.split(r'[^A-Z0-9]', dest_upper)
+    valid_parts = []
+    for part in parts:
+        if part and is_valid_dest_code(part):
+            valid_parts.append(part)
+            
+    if valid_parts:
+        return "-".join(valid_parts)
+    
     m = re.match(r'^([A-Za-z0-9]+)', dest_upper)
     if m:
         return m.group(1)
@@ -215,7 +227,7 @@ def get_destino_nombre(destino):
     if not destino:
         return ""
     dest_upper = str(destino).upper()
-    if "SAF1_SIQ1_SAR1" in dest_upper:
+    if "SAF1" in dest_upper and "SIQ1" in dest_upper and "SAR1" in dest_upper:
         return "Combinado del Norte"
         
     individual_mappings = [
@@ -237,7 +249,7 @@ def get_destino_nombre(destino):
         ("CLCBXP", "Bluexpress")
     ]
     
-    parts = dest_upper.split("_")
+    parts = re.split(r'[_+,-]', dest_upper)
     matched_names = []
     for part in parts:
         for code, name in individual_mappings:
@@ -249,6 +261,7 @@ def get_destino_nombre(destino):
     if matched_names:
         return "-".join(matched_names)
     return ""
+
 
 # --- Rutas ---
 @app.route('/')
